@@ -4,8 +4,6 @@ use std;
 use math::*;
 use rendering::gl;
 
-use std::mem::transmute;
-
 #[derive(Copy, Clone)]
 pub struct Shader {
 	pub gl_handle: u32,

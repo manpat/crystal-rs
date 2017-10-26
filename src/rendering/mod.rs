@@ -1,8 +1,3 @@
-use ems;
-use std::ops::Drop;
-use std::ffi::CString;
-use std::mem::uninitialized;
-
 // #[link_args = "-s FULL_ES2=1"]
 // extern {}
 

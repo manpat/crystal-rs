@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use math::*;
 use rendering::gl;
 use rendering::types::*;
 

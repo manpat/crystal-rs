@@ -17,13 +17,13 @@ mod crystal;
 
 use std::time;
 
-use rendering::mesh_builder::{MeshBuilder, Vertex, Mesh};
-use resources::*;
+use rendering::mesh_builder::{MeshBuilder, Mesh};
 use rendering::*;
-use easing::*;
-use math::*;
 
-use rand::{thread_rng, Rng};
+pub use resources::*;
+pub use easing::*;
+pub use math::*;
+
 use rand::{random, Closed01};
 
 #[macro_export]
@@ -85,7 +85,7 @@ fn main() {
 		panic!("Failed to make webgl context current");
 	}
 
-	js!{ b"document.addEventListener('contextmenu', function(e) {console.log(e); e.preventDefault(); return false; })\0" };
+	// js!{ b"document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; })\0" };
 
 	let ctx = MainContext::new();
 	ems::register_callbacks(Box::into_raw(box ctx));
@@ -160,6 +160,7 @@ impl MainContext {
 			gl::EnableVertexAttribArray(0);
 
 			self.crystal_mesh.bind();
+			self.crystal_mesh.draw(gl::POINTS);
 			self.crystal_mesh.draw(gl::LINES);
 		}
 	}
