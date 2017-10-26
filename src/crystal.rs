@@ -13,7 +13,7 @@ pub struct Crystal {
 	faces: Vec<Face>,
 }
 
-struct Vertex (Vec3);
+struct Vertex (Vec3, usize);
 struct Face (usize);
 
 // https://www.openmesh.org/Daily-Builds/Doc/a00016.html
@@ -44,7 +44,7 @@ impl Crystal {
 	pub fn build_with(&self, mb: &mut mesh_builder::MeshBuilder) {
 		use mesh_builder::Vertex as MBVert;
 
-		// for &Vertex(v) in self.verts.iter() {
+		// for &Vertex(v, _) in self.verts.iter() {
 		// 	mb.add_vert(MBVert::new(v));
 		// }
 
@@ -90,9 +90,9 @@ impl Crystal {
 
 		let num_sides = self.base_shape.len();
 
-		for v2 in self.base_shape.iter() {
-			self.verts.push(Vertex (v2.to_x0z() * self.radius - Vec3::new(0.0, 1.0, 0.0)));
-			self.verts.push(Vertex (v2.to_x0z() * self.radius + Vec3::new(0.0, 1.0, 0.0)));
+		for (i, v2) in self.base_shape.iter().enumerate() {
+			self.verts.push(Vertex (v2.to_x0z() * self.radius - Vec3::new(0.0, 1.0, 0.0), i*6 + 0));
+			self.verts.push(Vertex (v2.to_x0z() * self.radius + Vec3::new(0.0, 1.0, 0.0), i*6 + 1));
 		}
 
 		for i in 0..num_sides {
@@ -194,6 +194,22 @@ impl Crystal {
 		// for i in 0..num_edges {
 		// 	self.split_edge(i, 0.5);
 		// }
+
+		let e0 = self.split_edge(0, 0.5);
+		let e1 = self.split_edge(2, 0.4);
+
+		let v0 = self.edges[e0].vertex;
+		let v1 = self.edges[e1].vertex;
+
+		let e2 = self.connect_vertices(v0, v1);
+
+		let e2t = self.edge_twin(e2);
+		let e3 = self.split_edge(e2t, 0.5);
+		let e4 = self.split_edge(1, 0.5);
+
+		let v2 = self.edges[e3].vertex;
+		let v3 = self.edges[e4].vertex;
+		self.connect_vertices(v2, v3);
 	}
 
 	fn generate_base_shape(&mut self) {
@@ -211,10 +227,14 @@ impl Crystal {
 		}
 	}
 
+	// Returns new outgoing edge
 	fn split_edge(&mut self, edge: usize, perc: f32) -> usize {
+		println!("splitting edge {}", edge);
+
 		let next = self.edge_next(edge);
 		let twin = self.edge_twin(edge);
 		let twinprev = self.edges[twin].prev;
+		let old_twin_vert = self.edges[twin].vertex;
 
 		let origin = self.edge_origin(edge);
 		let new_vertex_pos = origin + (self.edge_origin(next) - origin) * perc;
@@ -247,7 +267,7 @@ impl Crystal {
 			},
 		];
 
-		self.verts.push(Vertex(new_vertex_pos));
+		self.verts.push(Vertex(new_vertex_pos, new_edge));
 		self.edges.extend_from_slice(&new_edges);
 
 		// Update original edge
@@ -259,134 +279,98 @@ impl Crystal {
 		self.edges[twin].prev = new_edge_twin;
 		self.edges[twin].vertex = new_vertex;
 
+		// Update old twins vertex outgoing edge
+		if self.verts[old_twin_vert].1 == twin {
+			self.verts[old_twin_vert].1 = new_edge_twin;
+		}
+
 		new_edge
 	}
 
-	// fn split_face(&mut self, face: usize) {
-	// 	let e0 = self.faces[face].0;
-	// 	let e0twin = self.edges[e0].twin;
-	// 	let e0next = self.edges[e0].next;
-	// 	let e0twinprev = self.edges[e0twin].prev;
-	// 	let e0twinface = self.edges[e0twin].face;
+	// returns new edge (new edge belongs to new face)
+	fn connect_vertices(&mut self, v0: usize, v1: usize) -> usize {
+		println!("connecting vertices {} -> {}", v0, v1);
 
-	// 	let e1 = self.edge_next(e0next);
-	// 	let e1twin = self.edges[e1].twin;
-	// 	let e1next = self.edges[e1].next;
-	// 	let e1twinprev = self.edges[e1twin].prev;
-	// 	let e1twinface = self.edges[e1twin].face;
+		let start = self.verts[v0].1;
+		let mut v0_outgoing_edges = vec![start];
 
-	// 	let v0 = (self.edge_origin(e0) + self.edge_origin(e0next)) / 2.0;
-	// 	let v1 = (self.edge_origin(e1) + self.edge_origin(e1next)) / 2.0;
+		let mut it = self.edge_next(self.edge_twin(start));
+		while it != start {
+			v0_outgoing_edges.push(it);
+			assert!(self.edges[it].vertex == v0);
 
-	// 	let num_verts = self.verts.len();
-	// 	let num_edges = self.edges.len();
-	// 	let num_faces = self.faces.len();
+			it = self.edge_next(self.edge_twin(it));
+		}
 
-	// 	let new_rising_edge			= num_edges;
-	// 	let new_rising_edge_twin	= num_edges + 1;
-	// 	let new_falling_edge		= num_edges + 2;
-	// 	let new_falling_edge_twin	= num_edges + 3;
-	// 	let top_split_edge			= num_edges + 4;
-	// 	let bottom_split_edge		= num_edges + 5;
+		let mut connecting_edge_loop = None;
 
-	// 	// Create new edges
-	// 	let new_edges = [
-	// 		// Rising edge
-	// 		HalfEdge {
-	// 			vertex: num_verts,
-	// 			next: e0next,
-	// 			twin: new_rising_edge_twin,
-	// 			prev: e0,
+		'loop_search: for start in v0_outgoing_edges {
+			let mut it = self.edge_next(start);
+			while it != start {
+				if self.edges[it].vertex == v1 {
+					connecting_edge_loop = Some((start, self.edges[it].prev));
+					break 'loop_search;
+				}
 
-	// 			face: num_faces,
-	// 		},
+				it = self.edge_next(it);
+			}
+		}
 
-	// 		// Twin Falling edge
-	// 		HalfEdge {
-	// 			vertex: self.edges[e0twin].vertex,
-	// 			next: e0twin,
-	// 			twin: new_rising_edge,
-	// 			prev: e0twinprev,
+		assert!(connecting_edge_loop.is_some(), "vertices must already be in an edge loop before connecting");
 
-	// 			face: self.edges[e0twin].face,
-	// 		},
+		let (v0_outgoing_edge, v1_incoming_edge) = connecting_edge_loop.unwrap();
+		let v0_incoming_edge = self.edges[v0_outgoing_edge].prev;
+		let v1_outgoing_edge = self.edges[v1_incoming_edge].next;
 
-	// 		// Falling edge
-	// 		HalfEdge {
-	// 			vertex: num_verts + 1,
-	// 			next: e1next,
-	// 			twin: new_falling_edge_twin,
-	// 			prev: e1,
+		let new_edge		= self.edges.len();
+		let new_edge_twin	= new_edge + 1;
 
-	// 			face: face,
-	// 		},
+		let new_face = self.faces.len();
+		let old_face = self.edges[v1_incoming_edge].face;
 
-	// 		// Twin rising edge
-	// 		HalfEdge {
-	// 			vertex: self.edges[e1twin].vertex,
-	// 			next: e1twin,
-	// 			twin: new_falling_edge,
-	// 			prev: e1twinprev,
+		let new_edges = [
+			// New edge
+			HalfEdge {
+				vertex: v0,
+				next: v1_outgoing_edge,
+				twin: new_edge_twin,
+				prev: v0_incoming_edge,
 
-	// 			face: self.edges[e1twin].face,
-	// 		},
+				face: new_face,
+			},
 
-	// 		// Split top
-	// 		HalfEdge {
-	// 			vertex: num_verts + 1,
-	// 			next: new_rising_edge,
-	// 			twin: bottom_split_edge,
-	// 			prev: e1,
+			// New twin edge
+			HalfEdge {
+				vertex: v1,
+				next: v0_outgoing_edge,
+				twin: new_edge,
+				prev: v1_incoming_edge,
 
-	// 			face: num_faces,
-	// 		},
+				face: old_face,
+			},
+		];
 
-	// 		// Split bottom
-	// 		HalfEdge {
-	// 			vertex: num_verts,
-	// 			next: new_falling_edge,
-	// 			twin: top_split_edge,
-	// 			prev: e0,
+		self.edges.extend_from_slice(&new_edges);
+		self.faces.push(Face(new_edge));
 
-	// 			face: face,
-	// 		},
-	// 	];
+		self.edges[v0_incoming_edge].next = new_edge;
+		self.edges[v1_outgoing_edge].prev = new_edge;
 
-	// 	self.verts.push(Vertex(v0 * 1.4));
-	// 	self.verts.push(Vertex(v1 * 1.4));
+		self.edges[v1_incoming_edge].next = new_edge_twin;
+		self.edges[v0_outgoing_edge].prev = new_edge_twin;
 
-	// 	self.edges.extend_from_slice(&new_edges);
+		// Ensure the old face is pointing to the right edge loop
+		self.faces[old_face].0 = new_edge_twin;
 
-	// 	// Create new face
-	// 	self.faces.push(Face(new_rising_edge));
+		// Update new loop with new face
+		let mut it = self.edge_next(new_edge);
+		while it != new_edge {
+			self.edges[it].face = new_face;
+			it = self.edge_next(it);
+		}
 
-	// 	// Update rising edge
-	// 	self.edges[e0].next = bottom_split_edge;
-	// 	self.edges[e0next].prev = new_rising_edge;
-
-	// 	// Update falling edge
-	// 	self.edges[e1].next = top_split_edge;
-	// 	self.edges[e1next].prev = new_falling_edge;
-
-	// 	// Update twin falling edge 
-	// 	self.edges[e0twin].vertex = num_verts;
-	// 	self.edges[e0twinprev].next = new_rising_edge_twin;
-	// 	self.edges[e0twin].prev = new_rising_edge_twin;
-
-	// 	// Update twin rising edge 
-	// 	self.edges[e1twin].vertex = num_verts + 1;
-	// 	self.edges[e1twinprev].next = new_falling_edge_twin;
-	// 	self.edges[e1twin].prev = new_falling_edge_twin;
-
-	// 	// Update new loop with new face
-	// 	let mut it = new_rising_edge;
-	// 	loop {
-	// 		self.edges[it].face = num_faces;
-
-	// 		it = self.edge_next(it);
-	// 		if it == num_edges { break }
-	// 	}
-	// }
+		new_edge
+	}
 
 	// fn clip_with_plane(&mut self, plane: &Plane) {
 	// 	let mut faces_to_remove = Vec::new();

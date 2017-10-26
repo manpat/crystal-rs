@@ -160,7 +160,7 @@ impl MainContext {
 			gl::EnableVertexAttribArray(0);
 
 			self.crystal_mesh.bind();
-			self.crystal_mesh.draw(gl::POINTS);
+			// self.crystal_mesh.draw(gl::POINTS);
 			self.crystal_mesh.draw(gl::LINES);
 		}
 	}
