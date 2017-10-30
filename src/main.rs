@@ -6,6 +6,18 @@
 
 extern crate rand;
 
+#[macro_use]
+mod enums {
+	macro_rules! match_enum {
+		($v:expr, $p:pat) => {
+			match $v {
+				$p => true,
+				_ => false,
+			}
+		}
+	}
+}
+
 mod resources;
 mod rendering;
 mod easing;
@@ -25,16 +37,6 @@ pub use easing::*;
 pub use math::*;
 
 use rand::{random, Closed01};
-
-#[macro_export]
-macro_rules! match_enum {
-	($v:expr, $p:pat) => {
-		match $v {
-			$p => true,
-			_ => false,
-		}
-	}
-}
 
 pub fn rand_f32 (range: f32) -> f32 {
 	let Closed01(f) = random::<Closed01<f32>>();
@@ -99,6 +101,7 @@ pub struct MainContext {
 
 	cmbuilder: MeshBuilder,
 	crystal_mesh: Mesh,
+	crystal_mesh_points: Mesh,
 }
 
 impl MainContext {
@@ -119,6 +122,7 @@ impl MainContext {
 
 			cmbuilder: MeshBuilder::new(),
 			crystal_mesh: Mesh::new(),
+			crystal_mesh_points: Mesh::new(),
 		}
 	}
 
@@ -135,9 +139,7 @@ impl MainContext {
 		self.fit_canvas();
 
 		if self.crystal_mesh.count < 3 {
-			self.cmbuilder.clear();
 			self.build_crystal();
-			self.cmbuilder.upload_to(&mut self.crystal_mesh);
 		}
 	}
 
@@ -160,8 +162,10 @@ impl MainContext {
 			gl::EnableVertexAttribArray(0);
 
 			self.crystal_mesh.bind();
-			// self.crystal_mesh.draw(gl::POINTS);
 			self.crystal_mesh.draw(gl::LINES);
+			
+			self.crystal_mesh_points.bind();
+			self.crystal_mesh_points.draw(gl::POINTS);
 		}
 	}
 
@@ -187,6 +191,12 @@ impl MainContext {
 		crystal.radius = 0.5;
 
 		crystal.generate();
+		self.cmbuilder.clear();
 		crystal.build_with(&mut self.cmbuilder);
+		self.cmbuilder.upload_to(&mut self.crystal_mesh);
+
+		self.cmbuilder.clear();
+		crystal.build_points_with(&mut self.cmbuilder);
+		self.cmbuilder.upload_to(&mut self.crystal_mesh_points);
 	}
 }

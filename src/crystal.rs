@@ -13,7 +13,10 @@ pub struct Crystal {
 	faces: Vec<Face>,
 }
 
+#[derive(Copy, Clone)]
 struct Vertex (Vec3, usize);
+
+#[derive(Copy, Clone)]
 struct Face (usize);
 
 // https://www.openmesh.org/Daily-Builds/Doc/a00016.html
@@ -41,12 +44,16 @@ impl Crystal {
 		}
 	}
 
-	pub fn build_with(&self, mb: &mut mesh_builder::MeshBuilder) {
+	pub fn build_points_with(&self, mb: &mut mesh_builder::MeshBuilder) {
 		use mesh_builder::Vertex as MBVert;
 
-		// for &Vertex(v, _) in self.verts.iter() {
-		// 	mb.add_vert(MBVert::new(v));
-		// }
+		for &Vertex(v, _) in self.verts.iter() {
+			mb.add_vert(MBVert::new(v));
+		}
+	}
+
+	pub fn build_with(&self, mb: &mut mesh_builder::MeshBuilder) {
+		use mesh_builder::Vertex as MBVert;
 
 		let vs = &self.verts;
 		let es = &self.edges;
@@ -183,33 +190,12 @@ impl Crystal {
 		self.faces.push(Face(4)); // bottom
 		self.faces.push(Face(5)); // top
 
-		// let plane = Plane::new(Vec3::new(0.0, 1.0, 0.0), 0.5);
-		// self.clip_with_plane(&plane);
-		// let num_faces = self.faces.len();
-		// for i in 0..1 {
-		// 	self.split_face(i);
-		// }
-
-		// let num_edges = self.edges.len();
-		// for i in 0..num_edges {
-		// 	self.split_edge(i, 0.5);
-		// }
-
-		let e0 = self.split_edge(0, 0.5);
-		let e1 = self.split_edge(2, 0.4);
-
-		let v0 = self.edges[e0].vertex;
-		let v1 = self.edges[e1].vertex;
-
-		let e2 = self.connect_vertices(v0, v1);
-
-		let e2t = self.edge_twin(e2);
-		let e3 = self.split_edge(e2t, 0.5);
-		let e4 = self.split_edge(1, 0.5);
-
-		let v2 = self.edges[e3].vertex;
-		let v3 = self.edges[e4].vertex;
-		self.connect_vertices(v2, v3);
+		self.clip_with_plane(&Plane::new(Vec3::new(0.8, 1.0, 0.0), 0.4));
+		// self.clip_with_plane(&Plane::new(Vec3::new(0.0, 0.5, 0.8), 0.4));
+		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.1,-0.8), 0.2));
+		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.2,-0.8), 0.0));
+		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.2,-0.8), 0.0));
+		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.2,-0.8), 0.0));
 	}
 
 	fn generate_base_shape(&mut self) {
@@ -372,37 +358,219 @@ impl Crystal {
 		new_edge
 	}
 
-	// fn clip_with_plane(&mut self, plane: &Plane) {
-	// 	let mut faces_to_remove = Vec::new();
-	// 	let mut faces_to_clip = Vec::new();
+	fn clip_with_plane(&mut self, plane: &Plane) {
+		// Contains the distances of each vertex to the plane
+		let vertex_clip_data = self.verts.iter()
+			.map(|&Vertex(p, _)| plane.dist(p))
+			.collect::<Vec<_>>();
 
-	// 	for (face, &Face(start)) in self.faces.iter().enumerate() {
-	// 		let mut it = start;
-	// 		let mut verts_passing = 0;
-	// 		let mut verts_failing = 0;
+		#[derive(Copy, Clone, Debug)]
+		enum EdgeData {
+			Unseen,
+			NoIntersection,
+			Intersects(f32),
+			TwinIntersects,
+		};
 
-	// 		loop {				
-	// 			if plane.dist(self.edge_origin(it)) > 0.0 {
-	// 				verts_failing += 1;
-	// 			} else {
-	// 				verts_passing += 1;
-	// 			}
+		let mut edge_data = vec![EdgeData::Unseen; self.edges.len()];
 
-	// 			it = self.edge_next(it);
-	// 			if it == start { break }
-	// 		}
+		for (it, &edge) in self.edges.iter().enumerate() {
+			if !match_enum!(edge_data[it], EdgeData::Unseen) { continue }
 
-	// 		if verts_passing == 0 {
-	// 			faces_to_remove.push(face);
-	// 		} else if verts_failing != 0 {
-	// 			faces_to_clip.push(face);
-	// 		}
-	// 	}
+			let clip_origin = vertex_clip_data[edge.vertex];
+			let clip_dest = vertex_clip_data[self.edges[edge.next].vertex];
 
-	// 	println!("faces to remove: {}", faces_to_remove.len());
-	// 	println!("faces to clip: {}", faces_to_clip.len());
-	// 	println!("faces to leave: {}", self.faces.len() - faces_to_clip.len() - faces_to_remove.len());
-	// }
+			// Doesn't intersect plane
+			if clip_origin.is_sign_positive() == clip_dest.is_sign_positive() {
+				edge_data[it] = EdgeData::NoIntersection;
+				edge_data[edge.twin] = EdgeData::NoIntersection;
+
+				continue
+			}
+
+			let diff = clip_dest.abs() + clip_origin.abs();
+			let intersection_point = clip_origin.abs() / diff;
+
+			edge_data[it] = EdgeData::Intersects(intersection_point);
+			edge_data[edge.twin] = EdgeData::TwinIntersects;
+		}
+
+		// Contains outgoing edges from new vertices
+		let mut new_edges = Vec::new();
+
+		// Split edges intersecting with plane
+		for (it, &data) in edge_data.iter().enumerate() {
+			if let EdgeData::Intersects(pt) = data {
+				let new_edge = self.split_edge(it, pt);
+				new_edges.push(new_edge);
+				new_edges.push(self.edge_next(self.edge_twin(new_edge)));
+			}
+		}
+
+		assert!(new_edges.len() != 0);
+
+		let mut seen_faces = Vec::new();
+		let mut new_face_edges = Vec::new();
+
+		// Connect new vertices
+		for &edge in new_edges.iter() {
+			let face = self.edges[edge].face;
+
+			// Faces can only be split once per plane clip,
+			// 	so we only need to process each face once
+			if seen_faces.contains(&face) { continue }
+			seen_faces.push(face);
+
+			let vert = self.edges[edge].vertex;
+			
+			// Search for the other new edge on this face
+			// 	and connect em
+			let mut it = self.edge_next(edge);
+			while it != edge {
+				if new_edges.contains(&it) {
+					let vert2 = self.edges[it].vertex;
+					new_face_edges.push(self.connect_vertices(vert, vert2));
+					break;
+				}
+
+				it = self.edge_next(it);
+			}
+		}
+
+		assert!(new_face_edges.len() != 0);
+
+		let mut faces_to_delete = Vec::new();
+		for (face, &Face(start)) in self.faces.iter().enumerate() {
+			let mut edge = start;
+			loop {
+				let v = self.edges[edge].vertex;
+				if v < vertex_clip_data.len() && vertex_clip_data[v] > 0.0 {
+					faces_to_delete.push(face);
+					break
+				}
+
+				edge = self.edge_next(edge);
+				if edge == start { break }
+			}
+		}
+
+		let new_face = self.faces.len();
+
+		for it in new_face_edges.iter_mut() {
+			if faces_to_delete.contains(&self.edges[*it].face) {
+				self.edges[*it].face = new_face;
+			} else {
+				*it = self.edge_twin(*it);
+
+				let face = &mut self.edges[*it].face;
+				assert!(faces_to_delete.contains(face));
+				*face = new_face;
+			}
+		}
+
+		for &edge in new_face_edges.iter() {
+			let mut it = self.edge_next(edge);
+			let end = self.edge_twin(edge);
+
+			while it != end {
+				if new_face_edges.contains(&it) {
+					self.edges[edge].next = it;
+					self.edges[it].prev = it;
+					break
+				}
+
+				it = self.edge_next(self.edge_twin(it));
+			}
+
+			assert!(it != end);
+		}
+
+		self.faces.push(Face(new_face_edges[0]));
+
+		// TODO: It's super heavy from here on out
+		// 	make it less heavy
+
+		faces_to_delete.sort();
+		let inverse_face_map = (0..self.faces.len())
+			.filter(|x| faces_to_delete.binary_search(x).is_err())
+			.collect::<Vec<_>>();
+
+		let face_map = (0..self.faces.len())
+			.map(|i| inverse_face_map.binary_search(&i).ok())
+			.collect::<Vec<_>>();
+
+		let inverse_vert_map = (0..self.verts.len())
+			.filter(|&x| x >= vertex_clip_data.len() || vertex_clip_data[x] <= 0.0)
+			.collect::<Vec<_>>();
+
+		let vertex_map = (0..self.verts.len())
+			.map(|i| inverse_vert_map.binary_search(&i).ok())
+			.collect::<Vec<_>>();
+
+		let mut edges_to_delete = Vec::new();
+
+		for (i, edge) in self.edges.iter_mut().enumerate() {
+			if let Some(face) = face_map[edge.face] {
+				edge.face = face;
+			} else {
+				edges_to_delete.push(i);
+				continue
+			}
+
+			if let Some(vertex) = vertex_map[edge.vertex] {
+				edge.vertex = vertex;
+			} else {
+				edges_to_delete.push(i);
+				continue
+			}
+		}
+
+		self.faces = inverse_face_map.iter()
+			.map(|&i| self.faces[i])
+			.collect::<Vec<_>>();
+
+		self.verts = inverse_vert_map.iter()
+			.map(|&i| self.verts[i])
+			.collect::<Vec<_>>();
+
+		let inverse_edge_map = (0..self.edges.len())
+			.filter(|x| edges_to_delete.binary_search(x).is_err())
+			.collect::<Vec<_>>();
+
+		let edge_map = (0..self.edges.len())
+			.map(|i| inverse_edge_map.binary_search(&i).ok())
+			.collect::<Vec<_>>();
+
+		self.edges = inverse_edge_map.iter()
+			.map(|&i| self.edges[i])
+			.collect::<Vec<_>>();
+
+		for edge in self.edges.iter_mut() {
+			if let Some(next) = edge_map[edge.next] {
+				edge.next = next;
+			}
+
+			if let Some(twin) = edge_map[edge.twin] {
+				edge.twin = twin;
+			}
+			
+			if let Some(prev) = edge_map[edge.prev] {
+				edge.prev = prev;
+			}
+		}
+
+		for &mut Face(ref mut edge) in self.faces.iter_mut() {
+			if let Some(new_edge) = edge_map[*edge] {
+				*edge = new_edge;
+			}
+		}
+
+		for &mut Vertex(_, ref mut edge) in self.verts.iter_mut() {
+			if let Some(new_edge) = edge_map[*edge] {
+				*edge = new_edge;
+			}
+		}
+	}
 
 	fn edge_next(&self, e: usize) -> usize {
 		self.edges[e].next
