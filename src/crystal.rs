@@ -13,10 +13,10 @@ pub struct Crystal {
 	faces: Vec<Face>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct Vertex (Vec3, usize);
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct Face (usize);
 
 // https://www.openmesh.org/Daily-Builds/Doc/a00016.html
@@ -190,12 +190,16 @@ impl Crystal {
 		self.faces.push(Face(4)); // bottom
 		self.faces.push(Face(5)); // top
 
+		self.assert_invariants();
+
 		self.clip_with_plane(&Plane::new(Vec3::new(0.8, 1.0, 0.0), 0.4));
 		// self.clip_with_plane(&Plane::new(Vec3::new(0.0, 0.5, 0.8), 0.4));
 		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.1,-0.8), 0.2));
 		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.2,-0.8), 0.0));
 		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.2,-0.8), 0.0));
 		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.2,-0.8), 0.0));
+
+		self.assert_invariants();
 	}
 
 	fn generate_base_shape(&mut self) {
@@ -437,6 +441,8 @@ impl Crystal {
 			}
 		}
 
+		self.assert_invariants();
+
 		assert!(new_face_edges.len() != 0);
 
 		let mut faces_to_delete = Vec::new();
@@ -475,7 +481,7 @@ impl Crystal {
 			while it != end {
 				if new_face_edges.contains(&it) {
 					self.edges[edge].next = it;
-					self.edges[it].prev = it;
+					self.edges[it].prev = edge;
 					break
 				}
 
@@ -513,6 +519,7 @@ impl Crystal {
 			if let Some(face) = face_map[edge.face] {
 				edge.face = face;
 			} else {
+				edge.face = !0;
 				edges_to_delete.push(i);
 				continue
 			}
@@ -520,6 +527,7 @@ impl Crystal {
 			if let Some(vertex) = vertex_map[edge.vertex] {
 				edge.vertex = vertex;
 			} else {
+				edge.vertex = !0;
 				edges_to_delete.push(i);
 				continue
 			}
@@ -533,6 +541,7 @@ impl Crystal {
 			.map(|&i| self.verts[i])
 			.collect::<Vec<_>>();
 
+
 		let inverse_edge_map = (0..self.edges.len())
 			.filter(|x| edges_to_delete.binary_search(x).is_err())
 			.collect::<Vec<_>>();
@@ -545,31 +554,89 @@ impl Crystal {
 			.map(|&i| self.edges[i])
 			.collect::<Vec<_>>();
 
-		for edge in self.edges.iter_mut() {
-			if let Some(next) = edge_map[edge.next] {
-				edge.next = next;
-			}
+		println!("{:?}", self.verts);
+		println!("{:?}", inverse_edge_map);
+		println!("{:?}", edge_map);
+		println!("{:?}", self.edges);
 
-			if let Some(twin) = edge_map[edge.twin] {
-				edge.twin = twin;
-			}
-			
-			if let Some(prev) = edge_map[edge.prev] {
-				edge.prev = prev;
-			}
+		for edge in self.edges.iter_mut() {
+			edge.next = edge_map[edge.next].unwrap_or(!0);
+			edge.twin = edge_map[edge.twin].unwrap_or(!0);
+			edge.prev = edge_map[edge.prev].unwrap_or(!0);
 		}
 
 		for &mut Face(ref mut edge) in self.faces.iter_mut() {
-			if let Some(new_edge) = edge_map[*edge] {
-				*edge = new_edge;
-			}
+			*edge = edge_map[*edge].unwrap_or(!0);
 		}
 
 		for &mut Vertex(_, ref mut edge) in self.verts.iter_mut() {
-			if let Some(new_edge) = edge_map[*edge] {
-				*edge = new_edge;
+			*edge = edge_map[*edge].unwrap_or(!0);
+		}
+	}
+
+	fn assert_invariants(&self) {
+		for (edge_it, edge) in self.edges.iter().enumerate() {
+			assert!(edge.next < self.edges.len(), "Edge {} has invalid next", edge_it);
+			assert!(edge.twin < self.edges.len(), "Edge {} has invalid twin", edge_it);
+			assert!(edge.prev < self.edges.len(), "Edge {} has invalid prev", edge_it);
+			assert!(edge.face < self.faces.len(), "Edge {} has invalid face", edge_it);
+			assert!(edge.vertex < self.verts.len(), "Edge {} has invalid vertex", edge_it);
+
+			assert!(edge.next != edge_it, "Edge {}'s next points to itself", edge_it);
+			assert!(edge.twin != edge_it, "Edge {}'s twin points to itself", edge_it);
+			assert!(edge.prev != edge_it, "Edge {}'s prev points to itself", edge_it);
+
+			let next = &self.edges[edge.next];
+			let twin = &self.edges[edge.twin];
+			let prev = &self.edges[edge.prev];
+
+			assert!(next.vertex == twin.vertex, "Edge {} next and twin have different origin vertices", edge_it);
+			assert!(next.prev == edge_it, "Edge {} next edge points to an incorrect prev", edge_it);
+			assert!(prev.next == edge_it, "Edge {} prev edge points to an incorrect next", edge_it);
+			assert!(twin.twin == edge_it, "Edge {} twin edge points to an incorrect twin", edge_it);
+		}
+
+		for (face, &Face(mut it)) in self.faces.iter().enumerate() {
+			let start = it;
+			let mut loop_count = 0;
+
+			loop {
+				let edge = &self.edges[it];
+
+				assert!(edge.face == face, "Inconsistent face pointers in edge loop");
+
+				it = self.edge_next(it);
+				if it == start { break }
+
+				loop_count += 1;
+				assert!(loop_count < 1000, "Found non-cyclic edge loop");
 			}
 		}
+
+		println!("{:?}", self.verts);
+
+		for (vertex, &Vertex(_, mut it)) in self.verts.iter().enumerate() {
+			let start = it;
+			let mut loop_count = 0;
+
+			loop {
+				assert!(it < self.edges.len(), "Outgoing edge of vertex {} is invalid", vertex);
+				let edge = &self.edges[it];
+
+				assert!(edge.twin < self.edges.len(), "Twin of outgoing edge of vertex {} is invalid", vertex);
+				let twin = &self.edges[edge.twin];
+
+				assert!(edge.vertex == vertex, "Edge adjacent to outgoing edge of vertex {} does not originate from same vertex", vertex);
+
+				it = twin.next;
+				if it == start { break }
+
+				loop_count += 1;
+				assert!(loop_count < 1000, "Edges adjacent to outgoing edge of vertex {} do not cycle", vertex);
+			}
+		}
+
+		println!("Invariants passed");
 	}
 
 	fn edge_next(&self, e: usize) -> usize {
