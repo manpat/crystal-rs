@@ -96,10 +96,11 @@ impl Crystal {
 		self.generate_base_shape();
 
 		let num_sides = self.base_shape.len();
+		let base_height = 5.0;
 
 		for (i, v2) in self.base_shape.iter().enumerate() {
-			self.verts.push(Vertex (v2.to_x0z() * self.radius - Vec3::new(0.0, 1.0, 0.0), i*6 + 0));
-			self.verts.push(Vertex (v2.to_x0z() * self.radius + Vec3::new(0.0, 1.0, 0.0), i*6 + 1));
+			self.verts.push(Vertex (v2.to_x0z() * self.radius - Vec3::new(0.0, base_height/2.0, 0.0), i*6 + 0));
+			self.verts.push(Vertex (v2.to_x0z() * self.radius + Vec3::new(0.0, base_height/2.0, 0.0), i*6 + 1));
 		}
 
 		for i in 0..num_sides {
@@ -192,8 +193,9 @@ impl Crystal {
 
 		self.assert_invariants();
 
-		self.clip_with_plane(&Plane::new(Vec3::new(0.8, 1.0, 0.0), 0.4));
-		// self.clip_with_plane(&Plane::new(Vec3::new(0.0, 0.5, 0.8), 0.4));
+		self.clip_with_plane(&Plane::new(Vec3::new(0.8, 1.0, 0.0), 0.6));
+		self.clip_with_plane(&Plane::new(Vec3::new(0.0, 0.5, 0.8), 0.5));
+		self.clip_with_plane(&Plane::new(Vec3::new(0.0,-1.0,-0.5), 0.8));
 		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.1,-0.8), 0.2));
 		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.2,-0.8), 0.0));
 		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.2,-0.8), 0.0));
@@ -533,6 +535,8 @@ impl Crystal {
 			}
 		}
 
+		edges_to_delete.sort();
+
 		self.faces = inverse_face_map.iter()
 			.map(|&i| self.faces[i])
 			.collect::<Vec<_>>();
@@ -554,11 +558,6 @@ impl Crystal {
 			.map(|&i| self.edges[i])
 			.collect::<Vec<_>>();
 
-		println!("{:?}", self.verts);
-		println!("{:?}", inverse_edge_map);
-		println!("{:?}", edge_map);
-		println!("{:?}", self.edges);
-
 		for edge in self.edges.iter_mut() {
 			edge.next = edge_map[edge.next].unwrap_or(!0);
 			edge.twin = edge_map[edge.twin].unwrap_or(!0);
@@ -569,9 +568,23 @@ impl Crystal {
 			*edge = edge_map[*edge].unwrap_or(!0);
 		}
 
-		for &mut Vertex(_, ref mut edge) in self.verts.iter_mut() {
-			*edge = edge_map[*edge].unwrap_or(!0);
+		for (vertid, &mut Vertex(_, ref mut edge)) in self.verts.iter_mut().enumerate() {
+			if let Some(mapped_edge) = edge_map[*edge] {
+				*edge = mapped_edge;
+				
+			} else {
+				*edge = !0;
+
+				for (edgeid, &e) in self.edges.iter().enumerate() {
+					if e.vertex == vertid {
+						*edge = edgeid;
+						break
+					}
+				}
+			}
 		}
+
+		self.assert_invariants();
 	}
 
 	fn assert_invariants(&self) {
