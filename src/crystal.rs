@@ -191,7 +191,7 @@ impl Crystal {
 		self.faces.push(Face(4)); // bottom
 		self.faces.push(Face(5)); // top
 
-		self.assert_invariants();
+		// self.assert_invariants();
 
 		self.clip_with_plane(&Plane::new(Vec3::new(0.8, 1.0, 0.0), 0.6));
 		self.clip_with_plane(&Plane::new(Vec3::new(0.0, 0.5, 0.8), 0.5));
@@ -443,7 +443,7 @@ impl Crystal {
 			}
 		}
 
-		self.assert_invariants();
+		// self.assert_invariants();
 
 		assert!(new_face_edges.len() != 0);
 
@@ -571,7 +571,7 @@ impl Crystal {
 		for (vertid, &mut Vertex(_, ref mut edge)) in self.verts.iter_mut().enumerate() {
 			if let Some(mapped_edge) = edge_map[*edge] {
 				*edge = mapped_edge;
-				
+
 			} else {
 				*edge = !0;
 
@@ -584,7 +584,7 @@ impl Crystal {
 			}
 		}
 
-		self.assert_invariants();
+		// self.assert_invariants();
 	}
 
 	fn assert_invariants(&self) {
@@ -625,8 +625,6 @@ impl Crystal {
 				assert!(loop_count < 1000, "Found non-cyclic edge loop");
 			}
 		}
-
-		println!("{:?}", self.verts);
 
 		for (vertex, &Vertex(_, mut it)) in self.verts.iter().enumerate() {
 			let start = it;
