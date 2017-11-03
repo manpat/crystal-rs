@@ -211,9 +211,11 @@ impl Crystal {
 		let num_sides: u32 = rng.gen_range(3, 6);
 		let max_jitter_amt = PI / num_sides as f32;
 
+		let offset = rng.gen_range(0.0, max_jitter_amt);
+
 		for i in 0..num_sides {
 			let jitter = rng.gen_range(-max_jitter_amt / 2.0, max_jitter_amt / 2.0);
-			let a = 2.0 * PI * i as f32 / num_sides as f32 + jitter;
+			let a = 2.0 * PI * i as f32 / num_sides as f32 + jitter + offset;
 
 			self.base_shape.push(Vec2::from_angle(a));
 		}

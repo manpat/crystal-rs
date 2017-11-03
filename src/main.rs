@@ -203,7 +203,10 @@ impl MainContext {
 	}
 
 	fn on_touch_down(&mut self, id: u32, pos: Vec2i) {
-		if self.touch_id.is_some() { return }
+		if self.touch_id.is_some() {
+			self.build_crystal();
+			return
+		}
 
 		self.touch_id = Some(id);
 		self.touch_start = pos;
