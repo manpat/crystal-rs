@@ -105,10 +105,15 @@ pub struct MainContext {
 
 	rotation: Quat,
 
-	touch_start: Option<Vec2i>,
 	touch_id: Option<u32>,
+	touch_start: Vec2i,
+	touch_prev: Vec2i,
 
 	touch_delta: Vec2,
+
+	// ems info
+	is_touch_input: bool,
+	is_potential_tap: bool,
 }
 
 impl MainContext {
@@ -133,10 +138,14 @@ impl MainContext {
 
 			rotation: Quat::from_raw(0.0, 0.0, 0.0, 1.0),
 
-			touch_start: None,
 			touch_id: None,
 			
+			touch_start: Vec2i::zero(),
+			touch_prev: Vec2i::zero(),
 			touch_delta: Vec2::zero(),
+
+			is_touch_input: false,
+			is_potential_tap: false,
 		}
 	}
 
@@ -197,25 +206,34 @@ impl MainContext {
 		if self.touch_id.is_some() { return }
 
 		self.touch_id = Some(id);
-		self.touch_start = Some(pos);
+		self.touch_start = pos;
+		self.touch_prev = pos;
 		self.touch_delta = Vec2::zero();
+
+		self.is_potential_tap = true;
 	}
 
 	fn on_touch_up(&mut self, id: u32) {
 		if self.touch_id != Some(id) { return }
 		self.touch_id = None;
-		self.touch_start = None;
+
+		if self.is_touch_input && self.is_potential_tap {
+			js! {{ b"Module.requestFullscreen(1, 1)\0" }};
+		}
 	}
 
 	fn on_touch_move(&mut self, id: u32, pos: Vec2i) {
 		if self.touch_id != Some(id) { return }
 
+		if (pos - self.touch_start).length() > 5.0 {
+			self.is_potential_tap = false;
+		}
+
 		let minor = self.viewport.size.x.min(self.viewport.size.y);
 
-		let diff = pos - self.touch_start.unwrap();
+		let diff = pos - self.touch_prev;
 		self.touch_delta = 0.9f32.ease_linear(self.touch_delta, diff.to_vec2() / Vec2::splat(minor as f32));
-
-		self.touch_start = Some(pos);
+		self.touch_prev = pos;
 	}
 
 	fn fit_canvas(&mut self) {

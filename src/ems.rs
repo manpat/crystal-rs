@@ -225,7 +225,7 @@ extern fn on_touch_up(_: i32, ev: *const EmscriptenTouchEvent, ud: *mut u8) -> i
 	let ctx: &mut MainContext = unsafe{ transmute(ud) };
 	let ev = unsafe { &*ev };
 
-	js! {{ b"if(!Module.crystalHasSetFullscreen) {Module.requestFullscreen(1, 1); Module.crystalHasSetFullscreen = true;}\0" }};
+	ctx.is_touch_input = true;
 
 	for i in 0..ev.num_touches {
 		let touch = &ev.touches[i as usize];
@@ -256,14 +256,18 @@ extern fn on_mouse_down(_: i32, ev: *const EmscriptenMouseEvent, ud: *mut u8) ->
 	let ctx: &mut MainContext = unsafe{ transmute(ud) };
 	let ev = unsafe { &*ev };
 
+	if ctx.is_touch_input { return 0 }
+
 	ctx.on_touch_down(0, Vec2i::new(ev.x, ev.y));
 
 	0
 }
 
-extern fn on_mouse_up(_: i32, ev: *const EmscriptenMouseEvent, ud: *mut u8) -> i32 {
+extern fn on_mouse_up(_: i32, _ev: *const EmscriptenMouseEvent, ud: *mut u8) -> i32 {
 	let ctx: &mut MainContext = unsafe{ transmute(ud) };
 	// let ev = unsafe { &*ev };
+
+	if ctx.is_touch_input { return 0 }
 
 	ctx.on_touch_up(0);
 
@@ -273,6 +277,8 @@ extern fn on_mouse_up(_: i32, ev: *const EmscriptenMouseEvent, ud: *mut u8) -> i
 extern fn on_mouse_move(_: i32, ev: *const EmscriptenMouseEvent, ud: *mut u8) -> i32 {
 	let ctx: &mut MainContext = unsafe{ transmute(ud) };
 	let ev = unsafe { &*ev };
+
+	if ctx.is_touch_input { return 0 }
 
 	ctx.on_touch_move(0, Vec2i::new(ev.x, ev.y));
 
