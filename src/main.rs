@@ -102,6 +102,13 @@ pub struct MainContext {
 	cmbuilder: MeshBuilder,
 	crystal_mesh: Mesh,
 	crystal_mesh_points: Mesh,
+
+	rotation: Quat,
+
+	touch_start: Option<Vec2i>,
+	touch_id: Option<u32>,
+
+	touch_delta: Vec2,
 }
 
 impl MainContext {
@@ -123,6 +130,13 @@ impl MainContext {
 			cmbuilder: MeshBuilder::new(),
 			crystal_mesh: Mesh::new(),
 			crystal_mesh_points: Mesh::new(),
+
+			rotation: Quat::from_raw(0.0, 0.0, 0.0, 1.0),
+
+			touch_start: None,
+			touch_id: None,
+			
+			touch_delta: Vec2::zero(),
 		}
 	}
 
@@ -152,9 +166,19 @@ impl MainContext {
 			let Vec2i{x: vw, y: vh} = self.viewport.size;
 			gl::Viewport(0, 0, vw, vh);
 
+			if self.touch_id.is_none() {
+				self.touch_delta = self.touch_delta * (1.0 - 1.0/60.0);
+			}
+
+			self.rotation = self.rotation
+				* Quat::new(Vec3::new(0.0, 1.0, 0.0), -self.touch_delta.x * PI / 2.0)
+				* Quat::new(Vec3::new(1.0, 0.0, 0.0), -self.touch_delta.y * PI / 2.0);
+
+			self.rotation = self.rotation.normalize();
+
 			let view_proj = Mat4::perspective(PI/3.0, self.viewport.get_aspect(), 0.005, 10.0)
 				* Mat4::translate(Vec3::new(0.0, 0.0,-2.0))
-				* Mat4::yrot(self.time as f32 * PI / 3.0);
+				* self.rotation.to_mat4();
 			
 			self.shader.use_program();
 			self.shader.set_proj(&view_proj);
@@ -169,9 +193,30 @@ impl MainContext {
 		}
 	}
 
-	fn on_touch_down(&mut self, _id: u32, _pos: Vec2i) {}
-	fn on_touch_up(&mut self, _id: u32) {}
-	fn on_touch_move(&mut self, _id: u32, _pos: Vec2i) {}
+	fn on_touch_down(&mut self, id: u32, pos: Vec2i) {
+		if self.touch_id.is_some() { return }
+
+		self.touch_id = Some(id);
+		self.touch_start = Some(pos);
+		self.touch_delta = Vec2::zero();
+	}
+
+	fn on_touch_up(&mut self, id: u32) {
+		if self.touch_id != Some(id) { return }
+		self.touch_id = None;
+		self.touch_start = None;
+	}
+
+	fn on_touch_move(&mut self, id: u32, pos: Vec2i) {
+		if self.touch_id != Some(id) { return }
+
+		let minor = self.viewport.size.x.min(self.viewport.size.y);
+
+		let diff = pos - self.touch_start.unwrap();
+		self.touch_delta = 0.9f32.ease_linear(self.touch_delta, diff.to_vec2() / Vec2::splat(minor as f32));
+
+		self.touch_start = Some(pos);
+	}
 
 	fn fit_canvas(&mut self) {
 		js! { b"Module.canvas = document.getElementById('canvas')\0" };

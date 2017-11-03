@@ -127,6 +127,7 @@ extern {
 	fn emscripten_set_keyup_callback(target: *const u8, ud: *mut u8, useCapture: i32, cb: EmKeyCallback);
 
 	fn emscripten_request_pointerlock(target: *const u8, defer: i32) -> i32;
+	fn emscripten_request_fullscreen(target: *const u8, defer: i32) -> i32;
 
 	pub fn emscripten_async_call(callback: EmArgCallback, ud: *mut u8, millis: i32);
 	pub fn emscripten_asm_const_int(s: *const u8, ...) -> i32;
@@ -191,6 +192,10 @@ pub fn register_callbacks(ctx: *mut MainContext) {
 		emscripten_set_touchmove_callback(ptr::null(), ctx as *mut u8, 0, on_touch_move);
 		emscripten_set_touchcancel_callback(ptr::null(), ctx as *mut u8, 0, on_touch_up);
 
+		emscripten_set_mousedown_callback(ptr::null(), ctx as *mut u8, 0, on_mouse_down);
+		emscripten_set_mouseup_callback(ptr::null(), ctx as *mut u8, 0, on_mouse_up);
+		emscripten_set_mousemove_callback(ptr::null(), ctx as *mut u8, 0, on_mouse_move);
+
 		emscripten_set_main_loop_arg(on_update, ctx as *mut u8, 0, 1);
 	}
 }
@@ -220,6 +225,8 @@ extern fn on_touch_up(_: i32, ev: *const EmscriptenTouchEvent, ud: *mut u8) -> i
 	let ctx: &mut MainContext = unsafe{ transmute(ud) };
 	let ev = unsafe { &*ev };
 
+	js! {{ b"if(!Module.crystalHasSetFullscreen) {Module.requestFullscreen(1, 1); Module.crystalHasSetFullscreen = true;}\0" }};
+
 	for i in 0..ev.num_touches {
 		let touch = &ev.touches[i as usize];
 		if touch.is_changed > 0 {
@@ -240,6 +247,34 @@ extern fn on_touch_move(_: i32, ev: *const EmscriptenTouchEvent, ud: *mut u8) ->
 			ctx.on_touch_move(touch.id as u32, Vec2i::new(touch.x, touch.y));
 		}
 	}
+
+	0
+}
+
+
+extern fn on_mouse_down(_: i32, ev: *const EmscriptenMouseEvent, ud: *mut u8) -> i32 {
+	let ctx: &mut MainContext = unsafe{ transmute(ud) };
+	let ev = unsafe { &*ev };
+
+	ctx.on_touch_down(0, Vec2i::new(ev.x, ev.y));
+
+	0
+}
+
+extern fn on_mouse_up(_: i32, ev: *const EmscriptenMouseEvent, ud: *mut u8) -> i32 {
+	let ctx: &mut MainContext = unsafe{ transmute(ud) };
+	// let ev = unsafe { &*ev };
+
+	ctx.on_touch_up(0);
+
+	0
+}
+
+extern fn on_mouse_move(_: i32, ev: *const EmscriptenMouseEvent, ud: *mut u8) -> i32 {
+	let ctx: &mut MainContext = unsafe{ transmute(ud) };
+	let ev = unsafe { &*ev };
+
+	ctx.on_touch_move(0, Vec2i::new(ev.x, ev.y));
 
 	0
 }
