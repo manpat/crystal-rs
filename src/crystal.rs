@@ -221,10 +221,10 @@ impl Crystal {
 
 		use ::rand_vec3;
 
-		for _ in 0..4 {
-			let normal = (rand_vec3() * Vec3::new(1.0, 0.7, 1.0)).normalize();
+		for i in 0..6 {
+			let normal = (rand_vec3() * Vec3::new(1.0, 0.6, 1.0)).normalize();
 			let upness = normal.dot(Vec3::new(0.0, 1.0, 0.0)).abs();
-			let clip_dist = 0.4 + upness * 0.3;
+			let clip_dist = 0.6 + upness * 0.3 - i as f32 * 0.07;
 
 			self.clip_with_plane(&Plane::new(normal, clip_dist));
 			self.clip_with_plane(&Plane::new(-normal, clip_dist));

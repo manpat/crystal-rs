@@ -43,8 +43,8 @@ pub fn rand_f32(range: f32) -> f32 {
 	f * range
 }
 
-pub fn rand_vec2(range: Vec2) -> Vec2 {
-	Vec2::new(rand_f32(range.x), rand_f32(range.y))
+pub fn rand_vec2() -> Vec2 {
+	Vec2::new(rand_f32(2.0) - 1.0, rand_f32(2.0) - 1.0)
 }
 
 pub fn rand_vec3() -> Vec3 {
@@ -164,6 +164,16 @@ impl MainContext {
 		let dt = udt as f64 / 1000_000.0;
 
 		self.time += dt;
+
+		if self.touch_id.is_none() && self.touch_delta.length() < 0.001 {
+			self.touch_delta = self.touch_delta + rand_vec2() * 0.0001;
+
+			// Sustain momentum
+			let dir = self.touch_delta.normalize();
+			if dir.x.is_finite() && dir.y.is_finite() {
+				self.touch_delta = self.touch_delta + dir * 0.0002;
+			}
+		}
 
 		self.fit_canvas();
 
