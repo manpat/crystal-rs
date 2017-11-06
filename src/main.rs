@@ -165,7 +165,7 @@ impl MainContext {
 
 		self.time += dt;
 
-		if self.touch_id.is_none() && self.touch_delta.length() < 0.001 {
+		if self.touch_id.is_none() && self.touch_delta.length() < 0.0005 {
 			self.touch_delta = self.touch_delta + rand_vec2() * 0.0001;
 
 			// Sustain momentum
@@ -173,6 +173,10 @@ impl MainContext {
 			if dir.x.is_finite() && dir.y.is_finite() {
 				self.touch_delta = self.touch_delta + dir * 0.0002;
 			}
+		}
+
+		if self.touch_id.is_none() {
+			self.touch_delta = self.touch_delta * (1.0 - dt as f32 * 0.3);
 		}
 
 		self.fit_canvas();
@@ -190,10 +194,6 @@ impl MainContext {
 
 			let Vec2i{x: vw, y: vh} = self.viewport.size;
 			gl::Viewport(0, 0, vw, vh);
-
-			if self.touch_id.is_none() {
-				self.touch_delta = self.touch_delta * (1.0 - 1.0/60.0);
-			}
 
 			self.rotation = self.rotation
 				* Quat::new(Vec3::new(0.0, 1.0, 0.0), -self.touch_delta.x * PI / 2.0)
