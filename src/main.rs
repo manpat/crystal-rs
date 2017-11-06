@@ -38,13 +38,17 @@ pub use math::*;
 
 use rand::{random, Closed01};
 
-pub fn rand_f32 (range: f32) -> f32 {
+pub fn rand_f32(range: f32) -> f32 {
 	let Closed01(f) = random::<Closed01<f32>>();
 	f * range
 }
 
-pub fn rand_vec2 (range: Vec2) -> Vec2 {
+pub fn rand_vec2(range: Vec2) -> Vec2 {
 	Vec2::new(rand_f32(range.x), rand_f32(range.y))
+}
+
+pub fn rand_vec3() -> Vec3 {
+	Vec3::new(rand_f32(2.0) - 1.0, rand_f32(2.0) - 1.0, rand_f32(2.0) - 1.0)
 }
 
 
@@ -95,7 +99,8 @@ fn main() {
 
 pub struct MainContext {
 	viewport: Viewport,
-	shader: Shader,
+	shader_main: Shader,
+	shader_crystal: Shader,
 	prev_frame: time::Instant,
 	time: f64,
 
@@ -128,7 +133,8 @@ impl MainContext {
 
 		MainContext {
 			viewport: Viewport::new(),
-			shader: Shader::new(&MAIN_SHADER_VERT_SRC, &MAIN_SHADER_FRAG_SRC),
+			shader_main: Shader::new(&MAIN_SHADER_VERT_SRC, &MAIN_SHADER_FRAG_SRC),
+			shader_crystal: Shader::new(&MAIN_SHADER_VERT_SRC, &CRYSTAL_SHADER_FRAG_SRC),
 			prev_frame: time::Instant::now(),
 			time: 0.0,
 
@@ -185,20 +191,28 @@ impl MainContext {
 
 			self.rotation = self.rotation.normalize();
 
-			let view_proj = Mat4::perspective(PI/3.0, self.viewport.get_aspect(), 0.005, 10.0)
-				* Mat4::translate(Vec3::new(0.0, 0.0,-2.0))
+			let view_mat = Mat4::translate(Vec3::new(0.0, 0.0,-2.0))
 				* self.rotation.to_mat4();
+
+			let view_proj = Mat4::perspective(PI/3.0, self.viewport.get_aspect(), 0.005, 10.0)
+				* view_mat;
 			
-			self.shader.use_program();
-			self.shader.set_proj(&view_proj);
+			self.shader_main.use_program();
+			self.shader_main.set_proj(&view_proj);
 
 			gl::EnableVertexAttribArray(0);
+			gl::EnableVertexAttribArray(1);
+			
+			// self.crystal_mesh_points.bind();
+			// self.crystal_mesh_points.draw(gl::POINTS);
+			// self.crystal_mesh.draw(gl::LINES);
+
+			self.shader_crystal.use_program();
+			self.shader_crystal.set_proj(&view_proj);
+			self.shader_crystal.set_view(&view_mat);
 
 			self.crystal_mesh.bind();
-			self.crystal_mesh.draw(gl::LINES);
-			
-			self.crystal_mesh_points.bind();
-			self.crystal_mesh_points.draw(gl::POINTS);
+			self.crystal_mesh.draw(gl::TRIANGLES);
 		}
 	}
 
@@ -258,11 +272,12 @@ impl MainContext {
 
 		crystal.generate();
 		self.cmbuilder.clear();
-		crystal.build_with(&mut self.cmbuilder);
+		crystal.build_faces(&mut self.cmbuilder);
+		// crystal.build_lines(&mut self.cmbuilder);
 		self.cmbuilder.upload_to(&mut self.crystal_mesh);
 
 		self.cmbuilder.clear();
-		crystal.build_points_with(&mut self.cmbuilder);
+		crystal.build_points(&mut self.cmbuilder);
 		self.cmbuilder.upload_to(&mut self.crystal_mesh_points);
 	}
 }

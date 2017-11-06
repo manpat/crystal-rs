@@ -6,7 +6,7 @@ use rendering::types::*;
 #[derive(Copy, Clone)]
 pub struct Vertex {
 	pos: Vec3,
-	// col: Vec3,
+	normal: Vec3,
 	// uv: Vec2,
 }
 
@@ -15,12 +15,12 @@ impl Vertex {
 	// 	Vertex {pos, col: col.to_vec3(), uv}
 	// }
 
-	// pub fn new(pos: Vec3, uv: Vec2) -> Self {
-	// 	Vertex::new_col(pos, Color::white(), uv)
-	// }
+	pub fn new_normal(pos: Vec3, normal: Vec3) -> Self {
+		Vertex{pos, normal}
+	}
 
 	pub fn new(pos: Vec3) -> Self {
-		Vertex{pos}
+		Vertex{pos, normal: Vec3::zero()}
 	}
 
 	pub fn get_size() -> u32 {
@@ -69,6 +69,16 @@ impl MeshBuilder {
 		self.verts.push(vs[2]);
 		self.verts.push(vs[3]);
 	}
+
+	pub fn add_convex_poly(&mut self, vs: &[Vertex]) {
+		assert!(vs.len() >= 3);
+
+		for i in 1..vs.len()-1 {
+			self.verts.push(vs[0]);
+			self.verts.push(vs[i]);
+			self.verts.push(vs[i+1]);
+		}
+	}
 }
 
 pub struct Mesh {
@@ -88,7 +98,7 @@ impl Mesh {
 		unsafe {
 			gl::BindBuffer(gl::ARRAY_BUFFER, self.vbo);
 			gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, Vertex::get_size() as _, 0 as _);
-			// gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, Vertex::get_size() as _, 12 as _);
+			gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, Vertex::get_size() as _, 12 as _);
 			// gl::VertexAttribPointer(2, 2, gl::FLOAT, gl::FALSE, Vertex::get_size() as _, 24 as _);
 		}
 	}

@@ -44,7 +44,7 @@ impl Crystal {
 		}
 	}
 
-	pub fn build_points_with(&self, mb: &mut mesh_builder::MeshBuilder) {
+	pub fn build_points(&self, mb: &mut mesh_builder::MeshBuilder) {
 		use mesh_builder::Vertex as MBVert;
 
 		for &Vertex(v, _) in self.verts.iter() {
@@ -52,7 +52,7 @@ impl Crystal {
 		}
 	}
 
-	pub fn build_with(&self, mb: &mut mesh_builder::MeshBuilder) {
+	pub fn build_lines(&self, mb: &mut mesh_builder::MeshBuilder) {
 		use mesh_builder::Vertex as MBVert;
 
 		let vs = &self.verts;
@@ -89,6 +89,32 @@ impl Crystal {
 		}
 	}
 
+	pub fn build_faces(&self, mb: &mut mesh_builder::MeshBuilder) {
+		use mesh_builder::Vertex as MBVert;
+
+		for &Face(start) in self.faces.iter() {
+			let mut it = self.edge_next(start);
+			let mut vs = vec![self.edge_origin(start)];
+
+			while it != start {
+				vs.push(self.edge_origin(it));
+				it = self.edge_next(it);
+			}
+
+			let normal = vs.windows(3).fold(Vec3::zero(), |a, v| {
+				let d0 = v[1] - v[0];
+				let d1 = v[1] - v[2];
+				a + d0.cross(d1)
+			}).normalize();
+
+			let vs = vs.iter()
+				.map(|&v| MBVert::new_normal(v, normal))
+				.collect::<Vec<_>>();
+
+			mb.add_convex_poly(&vs);
+		}
+	}
+
 	pub fn generate(&mut self) {
 		self.verts.clear();
 		self.edges.clear();
@@ -96,7 +122,7 @@ impl Crystal {
 		self.generate_base_shape();
 
 		let num_sides = self.base_shape.len();
-		let base_height = 5.0;
+		let base_height = 3.0;
 
 		for (i, v2) in self.base_shape.iter().enumerate() {
 			self.verts.push(Vertex (v2.to_x0z() * self.radius - Vec3::new(0.0, base_height/2.0, 0.0), i*6 + 0));
@@ -193,13 +219,16 @@ impl Crystal {
 
 		// self.assert_invariants();
 
-		self.clip_with_plane(&Plane::new(Vec3::new(0.8, 1.0, 0.0), 0.6));
-		self.clip_with_plane(&Plane::new(Vec3::new(0.0, 0.5, 0.8), 0.5));
-		self.clip_with_plane(&Plane::new(Vec3::new(0.0,-1.0,-0.5), 0.8));
-		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.1,-0.8), 0.2));
-		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.2,-0.8), 0.0));
-		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.2,-0.8), 0.0));
-		// self.clip_with_plane(&Plane::new(Vec3::new(0.6,-0.2,-0.8), 0.0));
+		use ::rand_vec3;
+
+		for _ in 0..4 {
+			let normal = (rand_vec3() * Vec3::new(1.0, 0.7, 1.0)).normalize();
+			let upness = normal.dot(Vec3::new(0.0, 1.0, 0.0)).abs();
+			let clip_dist = 0.4 + upness * 0.3;
+
+			self.clip_with_plane(&Plane::new(normal, clip_dist));
+			self.clip_with_plane(&Plane::new(-normal, clip_dist));
+		}
 
 		self.assert_invariants();
 	}
@@ -208,7 +237,7 @@ impl Crystal {
 		self.base_shape.clear();
 
 		let mut rng = thread_rng();
-		let num_sides: u32 = rng.gen_range(3, 6);
+		let num_sides: u32 = rng.gen_range(4, 6);
 		let max_jitter_amt = PI / num_sides as f32;
 
 		let offset = rng.gen_range(0.0, max_jitter_amt);
@@ -415,7 +444,7 @@ impl Crystal {
 			}
 		}
 
-		assert!(new_edges.len() != 0);
+		if new_edges.len() == 0 { return }
 
 		let mut seen_faces = Vec::new();
 		let mut new_face_edges = Vec::new();
