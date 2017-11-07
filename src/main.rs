@@ -99,7 +99,7 @@ fn main() {
 
 pub struct MainContext {
 	viewport: Viewport,
-	shader_main: Shader,
+	shader_star: Shader,
 	shader_crystal: Shader,
 	prev_frame: time::Instant,
 	time: f64,
@@ -107,6 +107,8 @@ pub struct MainContext {
 	cmbuilder: MeshBuilder,
 	crystal_mesh: Mesh,
 	crystal_mesh_points: Mesh,
+
+	star_mesh: Mesh,
 
 	rotation: Quat,
 
@@ -125,22 +127,44 @@ impl MainContext {
 	fn new() -> Self {
 		unsafe {
 			gl::Enable(gl::DEPTH_TEST);
+			gl::Enable(gl::CULL_FACE);
+			gl::Enable(gl::BLEND);
 
-			// gl::Enable(gl::BLEND);
-			// gl::BlendEquationSeparate(gl::FUNC_ADD, gl::FUNC_ADD);
-			// gl::BlendFuncSeparate(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA, gl::ONE, gl::ZERO);
+			gl::BlendEquation(gl::FUNC_ADD);
+			gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
 		}
+
+		let mut star_mesh = Mesh::new();
+		let mut star_builder = MeshBuilder::new();
+
+		for _ in 0..500 {
+			use rendering::mesh_builder::Vertex;
+
+			let x = rand_f32(1.0);
+
+			let dist = (1.0 - x) * 190.0 + 80.0;
+			let color = x * 0.8 + 0.1;
+			let point_size = x * 5.0 + 1.0;
+
+			let info = Vec3::new(color, point_size, 0.0);
+
+			star_builder.add_vert(Vertex::new_normal(rand_vec3().normalize() * dist, info));
+		}
+
+		star_builder.upload_to(&mut star_mesh);
 
 		MainContext {
 			viewport: Viewport::new(),
-			shader_main: Shader::new(&MAIN_SHADER_VERT_SRC, &MAIN_SHADER_FRAG_SRC),
-			shader_crystal: Shader::new(&MAIN_SHADER_VERT_SRC, &CRYSTAL_SHADER_FRAG_SRC),
+			shader_star: Shader::new(&STAR_SHADER_VERT_SRC, &STAR_SHADER_FRAG_SRC),
+			shader_crystal: Shader::new(&CRYSTAL_SHADER_VERT_SRC, &CRYSTAL_SHADER_FRAG_SRC),
 			prev_frame: time::Instant::now(),
 			time: 0.0,
 
 			cmbuilder: MeshBuilder::new(),
 			crystal_mesh: Mesh::new(),
 			crystal_mesh_points: Mesh::new(),
+
+			star_mesh,
 
 			rotation: Quat::from_raw(0.0, 0.0, 0.0, 1.0),
 
@@ -204,24 +228,30 @@ impl MainContext {
 			let view_mat = Mat4::translate(Vec3::new(0.0, 0.0,-2.0))
 				* self.rotation.to_mat4();
 
-			let view_proj = Mat4::perspective(PI/3.0, self.viewport.get_aspect(), 0.005, 10.0)
+			let view_proj = Mat4::perspective(PI/3.0, self.viewport.get_aspect(), 0.005, 1000.0)
 				* view_mat;
-			
-			self.shader_main.use_program();
-			self.shader_main.set_proj(&view_proj);
 
 			gl::EnableVertexAttribArray(0);
 			gl::EnableVertexAttribArray(1);
 			
-			// self.crystal_mesh_points.bind();
-			// self.crystal_mesh_points.draw(gl::POINTS);
-			// self.crystal_mesh.draw(gl::LINES);
+			self.shader_star.use_program();
+			self.shader_star.set_proj(&view_proj);
+
+			self.star_mesh.bind();
+			self.star_mesh.draw(gl::POINTS);
 
 			self.shader_crystal.use_program();
 			self.shader_crystal.set_proj(&view_proj);
 			self.shader_crystal.set_view(&view_mat);
 
 			self.crystal_mesh.bind();
+
+			gl::FrontFace(gl::CW);
+			self.shader_crystal.set_uniform_vec3("color", &Vec3::new(0.9, 0.0, 0.5));
+			self.crystal_mesh.draw(gl::TRIANGLES);
+
+			gl::FrontFace(gl::CCW);
+			self.shader_crystal.set_uniform_vec3("color", &Vec3::new(0.3, 0.0, 1.0));
 			self.crystal_mesh.draw(gl::TRIANGLES);
 		}
 	}
