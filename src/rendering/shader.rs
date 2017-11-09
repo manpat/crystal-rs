@@ -101,6 +101,13 @@ impl Shader {
 		}
 	}
 
+	pub fn set_uniform_vec4(&self, uniform: &str, v: &Vec4) {
+		unsafe {
+			// TODO: Make sure we're bound
+			gl::Uniform4f(self.get_uniform_loc(&uniform), v.x, v.y, v.z, v.w);
+		}
+	}
+
 	pub fn set_uniform_i32(&self, uniform: &str, v: i32) {
 		unsafe {
 			// TODO: Make sure we're bound

@@ -17,6 +17,7 @@ pub mod gl {
 pub mod types;
 pub mod shader;
 pub mod texture;
+pub mod framebuffer;
 
 pub mod mesh_builder;
 

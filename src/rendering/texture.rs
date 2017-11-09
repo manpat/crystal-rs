@@ -27,6 +27,10 @@ impl Texture {
 		Texture { gl_handle, size: Vec2i::zero() }
 	}
 
+	pub fn bind_guard(&self) -> TextureBindGuard {
+		TextureBindGuard::new_raw(self.gl_handle)
+	}
+
 	pub fn from_1d(data: &[Color]) -> Self {
 		let mut tex = Texture::new();
 		tex.upload_1d(data);
@@ -126,7 +130,16 @@ impl Texture {
 			let _bind_guard = TextureBindGuard::new(self);
 
 			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+		}
+	}
+
+	pub fn nearest(&mut self) {
+		unsafe {
+			let _bind_guard = TextureBindGuard::new(self);
+
 			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
 		}
 	}
 }

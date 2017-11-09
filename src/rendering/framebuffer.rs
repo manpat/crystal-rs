@@ -23,6 +23,27 @@ impl Framebuffer {
 			gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
 		}
 	}
+
+	pub fn get_target(&mut self, id: usize) -> Option<&mut Texture> {
+		if id >= self.targets.len() { return None }
+
+		Some(&mut self.targets[id])
+	}
+
+	pub fn resize(&mut self, nsize: Vec2i) {
+		if self.size == nsize { return }
+
+		unsafe {
+			for tex in self.targets.iter_mut() {
+				let _guard = tex.bind_guard();
+
+				gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, nsize.x, nsize.y, 0, 
+					gl::RGBA, gl::UNSIGNED_BYTE, 0 as *const _);
+			}
+		}
+
+		self.size = nsize;
+	}
 }
 
 pub struct FramebufferBuilder {
@@ -47,7 +68,7 @@ impl FramebufferBuilder {
 		self.fb
 	}
 
-	pub fn add_depth(&mut self) -> &mut Self {
+	pub fn add_depth(self) -> Self {
 		let mut gl_handle = 0;
 
 		unsafe {
@@ -70,7 +91,7 @@ impl FramebufferBuilder {
 		self
 	}
 
-	pub fn add_target(&mut self) -> &mut Self {
+	pub fn add_target(mut self) -> Self {
 		let mut gl_handle = 0;
 
 		let next_target = self.fb.targets.len() as u32;

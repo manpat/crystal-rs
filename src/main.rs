@@ -3,6 +3,7 @@
 #![feature(box_syntax)]
 #![feature(ord_max_min)]
 #![feature(slice_patterns)]
+#![feature(inclusive_range_syntax)]
 
 extern crate rand;
 
@@ -30,6 +31,7 @@ mod crystal;
 use std::time;
 
 use rendering::mesh_builder::{MeshBuilder, Mesh};
+use rendering::framebuffer::Framebuffer;
 use rendering::*;
 
 pub use resources::*;
@@ -99,7 +101,9 @@ fn main() {
 
 pub struct MainContext {
 	viewport: Viewport,
+	shader_fb: Shader,
 	shader_star: Shader,
+	shader_color: Shader,
 	shader_crystal: Shader,
 	prev_frame: time::Instant,
 	time: f64,
@@ -108,7 +112,9 @@ pub struct MainContext {
 	crystal_mesh: Mesh,
 	crystal_mesh_points: Mesh,
 
+	quad_mesh: Mesh,
 	star_mesh: Mesh,
+	star_target: Framebuffer,
 
 	rotation: Quat,
 
@@ -153,9 +159,33 @@ impl MainContext {
 
 		star_builder.upload_to(&mut star_mesh);
 
+		let mut quad_mesh = Mesh::new();
+		let mut quad_builder = star_builder;
+
+		{	use rendering::mesh_builder::Vertex;
+
+			quad_builder.clear();
+			quad_builder.add_quad(&[
+				Vertex::new(Vec3::new(-1.0,-1.0, 0.0)),
+				Vertex::new(Vec3::new( 1.0,-1.0, 0.0)),
+				Vertex::new(Vec3::new( 1.0, 1.0, 0.0)),
+				Vertex::new(Vec3::new(-1.0, 1.0, 0.0)),
+			]);
+		}
+
+		quad_builder.upload_to(&mut quad_mesh);
+
+		let mut star_target = framebuffer::FramebufferBuilder::new(Vec2i::splat(1))
+			.add_target()
+			.finalize();
+
+		star_target.get_target(0).unwrap().nearest();
+
 		MainContext {
 			viewport: Viewport::new(),
+			shader_fb: Shader::new(&FB_SHADER_VERT_SRC, &FB_SHADER_FRAG_SRC),
 			shader_star: Shader::new(&STAR_SHADER_VERT_SRC, &STAR_SHADER_FRAG_SRC),
+			shader_color: Shader::new(&FB_SHADER_VERT_SRC, &COLOR_SHADER_FRAG_SRC),
 			shader_crystal: Shader::new(&CRYSTAL_SHADER_VERT_SRC, &CRYSTAL_SHADER_FRAG_SRC),
 			prev_frame: time::Instant::now(),
 			time: 0.0,
@@ -164,7 +194,9 @@ impl MainContext {
 			crystal_mesh: Mesh::new(),
 			crystal_mesh_points: Mesh::new(),
 
+			quad_mesh,
 			star_mesh,
+			star_target,
 
 			rotation: Quat::from_raw(0.0, 0.0, 0.0, 1.0),
 
@@ -204,6 +236,7 @@ impl MainContext {
 		}
 
 		self.fit_canvas();
+		self.star_target.resize(self.viewport.size);
 
 		if self.crystal_mesh.count < 3 {
 			self.build_crystal();
@@ -219,26 +252,55 @@ impl MainContext {
 			let Vec2i{x: vw, y: vh} = self.viewport.size;
 			gl::Viewport(0, 0, vw, vh);
 
-			self.rotation = self.rotation
-				* Quat::new(Vec3::new(0.0, 1.0, 0.0), -self.touch_delta.x * PI / 2.0)
+			let rot_diff = Quat::new(Vec3::new(0.0, 1.0, 0.0), -self.touch_delta.x * PI / 2.0)
 				* Quat::new(Vec3::new(1.0, 0.0, 0.0), -self.touch_delta.y * PI / 2.0);
 
-			self.rotation = self.rotation.normalize();
+			let new_rotation = (self.rotation * rot_diff).normalize();
 
-			let view_mat = Mat4::translate(Vec3::new(0.0, 0.0,-2.0))
-				* self.rotation.to_mat4();
-
-			let view_proj = Mat4::perspective(PI/3.0, self.viewport.get_aspect(), 0.005, 1000.0)
-				* view_mat;
+			let proj_mat = Mat4::perspective(PI/3.0, self.viewport.get_aspect(), 0.005, 1000.0);
+			let trans_mat = Mat4::translate(Vec3::new(0.0, 0.0,-2.0));
 
 			gl::EnableVertexAttribArray(0);
 			gl::EnableVertexAttribArray(1);
 			
-			self.shader_star.use_program();
-			self.shader_star.set_proj(&view_proj);
+			self.star_target.bind();
+			self.shader_color.use_program();
+			self.shader_color.set_uniform_vec4("u_color", &Vec4::new(0.0, 0.0, 0.0, 0.15));
+			self.quad_mesh.bind();
+			self.quad_mesh.draw(gl::TRIANGLES);
 
-			self.star_mesh.bind();
-			self.star_mesh.draw(gl::POINTS);
+			self.shader_star.use_program();
+
+			let max_star_steps = 100;
+
+			for i in 0...max_star_steps {
+				let a = i as f32 / max_star_steps as f32;
+				let rotation = (self.rotation * (1.0 - a) + new_rotation * a).normalize();
+
+				let view_mat = trans_mat * rotation.to_mat4();
+				let view_proj = proj_mat * view_mat;
+
+				self.shader_star.set_proj(&view_proj);
+				self.star_mesh.bind();
+				self.star_mesh.draw(gl::POINTS);
+			}
+			Framebuffer::unbind();
+
+			self.rotation = new_rotation;
+
+			if let Some(tex) = self.star_target.get_target(0) {
+				let _guard = tex.bind_guard();
+
+				gl::DepthMask(gl::FALSE);
+				self.shader_fb.use_program();
+				self.shader_fb.set_uniform_i32("u_color", 0);
+				self.quad_mesh.bind();
+				self.quad_mesh.draw(gl::TRIANGLES);
+				gl::DepthMask(gl::TRUE);
+			}
+
+			let view_mat = trans_mat * new_rotation.to_mat4();
+			let view_proj = proj_mat * view_mat;
 
 			self.shader_crystal.use_program();
 			self.shader_crystal.set_proj(&view_proj);

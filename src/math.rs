@@ -18,7 +18,7 @@ pub struct Vec3{pub x: f32, pub y: f32, pub z: f32}
 #[derive(Copy, Clone, Debug)]
 pub struct Vec4{pub x: f32, pub y: f32, pub z: f32, pub w: f32}
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vec2i{pub x: i32, pub y: i32}
 
 #[repr(C)]
@@ -394,6 +394,13 @@ impl Mul<Vec3> for Mat4 {
 	}
 }
 
+impl Add<Quat> for Quat {
+	type Output = Quat;
+	fn add(self, o: Quat) -> Quat {
+		Quat::from_raw(self.x+o.x, self.y+o.y, self.z+o.z, self.w+o.w)
+	}
+}
+
 impl Mul<Quat> for Quat {
 	type Output = Quat;
 	fn mul(self, o: Quat) -> Quat {
@@ -403,6 +410,13 @@ impl Mul<Quat> for Quat {
 			-self.y*o.x + self.x*o.y + self.w*o.z + self.z*o.w,
 			-self.x*o.x - self.y*o.y - self.z*o.z + self.w*o.w
 		)
+	}
+}
+
+impl Mul<f32> for Quat {
+	type Output = Quat;
+	fn mul(self, o: f32) -> Quat {
+		Quat::from_raw(self.x*o, self.y*o, self.z*o, self.w*o)
 	}
 }
 
