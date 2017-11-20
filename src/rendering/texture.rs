@@ -71,6 +71,10 @@ impl Texture {
 		}
 	}
 
+	pub fn unbind() {
+		unsafe{ gl::BindTexture(gl::TEXTURE_2D, 0); }
+	}
+
 	pub fn bind_to_slot(&self, slot: u32) {
 		unsafe {
 			gl::ActiveTexture(gl::TEXTURE0 + slot);

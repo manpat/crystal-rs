@@ -189,6 +189,169 @@ impl Mat4 {
 		let t = scale;
 		Mat4::frustum(-r, r,-t, t, n, f)
 	}
+
+	pub fn determinant(&self) -> f32 {
+		let [a,b,c,d] = self.rows;
+
+		  a.x * b.y * c.z * d.w
+		+ a.x * b.z * c.w * d.y
+		+ a.x * b.w * c.y * d.z
+
+		+ a.y * b.x * c.w * d.z
+		+ a.y * b.z * c.x * d.w
+		+ a.y * b.w * c.z * d.x
+
+		+ a.z * b.x * c.y * d.w
+		+ a.z * b.y * c.w * d.x
+		+ a.z * b.w * c.x * d.y
+
+		+ a.w * b.x * c.z * d.y
+		+ a.w * b.y * c.x * d.z
+		+ a.w * b.z * c.y * d.x
+
+		- a.x * b.y * c.w * d.z
+		- a.x * b.z * c.y * d.w
+		- a.x * b.w * c.z * d.y
+
+		- a.y * b.x * c.z * d.w
+		- a.y * b.z * c.w * d.x
+		- a.y * b.w * c.x * d.z
+
+		- a.z * b.x * c.w * d.y
+		- a.z * b.y * c.x * d.w
+		- a.z * b.w * c.y * d.x
+
+		- a.w * b.x * c.y * d.z
+		- a.w * b.y * c.z * d.x
+		- a.w * b.z * c.x * d.y
+	}
+
+	pub fn inverse(&self) -> Mat4 {
+		let [a,b,c,d] = self.rows;
+		let inv_det = 1.0 / self.determinant();
+
+		Mat4::from_rows([
+			Vec4::new(
+				b.y * c.z * d.w
+				+ b.z * c.w * d.y
+				+ b.w * c.y * d.z
+				- b.y * c.w * d.z
+				- b.z * c.y * d.w
+				- b.w * c.z * d.y,
+
+				a.y * c.w * d.z
+				+ a.z * c.y * d.w
+				+ a.w * c.z * d.y
+				- a.y * c.z * d.w
+				- a.z * c.w * d.y
+				- a.w * c.y * d.z,
+
+				a.y * b.z * d.w
+				+ a.z * b.w * d.y
+				+ a.w * b.y * d.z
+				- a.y * b.w * d.z
+				- a.z * b.y * d.w
+				- a.w * b.z * d.y,
+
+				a.y * b.w * c.z
+				+ a.z * b.y * c.w
+				+ a.w * b.z * c.y
+				- a.y * b.z * c.w
+				- a.z * b.w * c.y
+				- a.w * b.y * c.z
+			) * inv_det,
+
+			Vec4::new(
+				b.x * c.w * d.z
+				+ b.z * c.x * d.w
+				+ b.w * c.z * d.x
+				- b.x * c.z * d.w
+				- b.z * c.w * d.x
+				- b.w * c.x * d.z,
+
+				a.x * c.z * d.w
+				+ a.z * c.w * d.x
+				+ a.w * c.x * d.z
+				- a.x * c.w * d.z
+				- a.z * c.x * d.w
+				- a.w * c.z * d.x,
+
+				a.x * b.w * d.z
+				+ a.z * b.x * d.w
+				+ a.w * b.z * d.x
+				- a.x * b.z * d.w
+				- a.z * b.w * d.x
+				- a.w * b.x * d.z,
+
+				a.x * b.z * c.w
+				+ a.z * b.w * c.x
+				+ a.w * b.x * c.z
+				- a.x * b.w * c.z
+				- a.z * b.x * c.w
+				- a.w * b.z * c.x
+			) * inv_det,
+
+			Vec4::new(
+				b.x * c.y * d.w
+				+ b.y * c.w * d.x
+				+ b.w * c.x * d.y
+				- b.x * c.w * d.y
+				- b.y * c.x * d.w
+				- b.w * c.y * d.x,
+
+				a.x * c.w * d.y
+				+ a.y * c.x * d.w
+				+ a.w * c.y * d.x
+				- a.x * c.y * d.w
+				- a.y * c.w * d.x
+				- a.w * c.x * d.y,
+
+				a.x * b.y * d.w
+				+ a.y * b.w * d.x
+				+ a.w * b.x * d.y
+				- a.x * b.w * d.y
+				- a.y * b.x * d.w
+				- a.w * b.y * d.x,
+
+				a.x * b.w * c.y
+				+ a.y * b.x * c.w
+				+ a.w * b.y * c.x
+				- a.x * b.y * c.w
+				- a.y * b.w * c.x
+				- a.w * b.x * c.y
+			) * inv_det,
+
+			Vec4::new(
+				b.x * c.z * d.y
+				+ b.y * c.x * d.z
+				+ b.z * c.y * d.x
+				- b.x * c.y * d.z
+				- b.y * c.z * d.x
+				- b.z * c.x * d.y,
+
+				a.x * c.y * d.z
+				+ a.y * c.z * d.x
+				+ a.z * c.x * d.y
+				- a.x * c.z * d.y
+				- a.y * c.x * d.z
+				- a.z * c.y * d.x,
+
+				a.x * b.z * d.y
+				+ a.y * b.x * d.z
+				+ a.z * b.y * d.x
+				- a.x * b.y * d.z
+				- a.y * b.z * d.x
+				- a.z * b.x * d.y,
+
+				a.x * b.y * c.z
+				+ a.y * b.z * c.x
+				+ a.z * b.x * c.y
+				- a.x * b.z * c.y
+				- a.y * b.x * c.z
+				- a.z * b.y * c.x
+			) * inv_det
+		])
+	}
 }
 
 impl Quat {
@@ -330,6 +493,13 @@ impl Div<Vec3> for Vec3 {
 	type Output = Vec3;
 	fn div(self, o: Vec3) -> Vec3 {
 		Vec3::new(self.x / o.x, self.y / o.y, self.z / o.z)
+	}
+}
+
+impl Mul<f32> for Vec4 {
+	type Output = Vec4;
+	fn mul(self, o: f32) -> Vec4 {
+		Vec4::new(self.x * o, self.y * o, self.z * o, self.w * o)
 	}
 }
 

@@ -8,6 +8,7 @@ use rendering::texture::*;
 pub struct Framebuffer {
 	gl_handle: u32,
 	targets: Vec<Texture>,
+	depth_target: Option<Texture>,
 	size: Vec2i,
 }
 
@@ -30,6 +31,10 @@ impl Framebuffer {
 		Some(&mut self.targets[id])
 	}
 
+	pub fn get_depth(&mut self) -> Option<&mut Texture> {
+		self.depth_target.as_mut()
+	}
+
 	pub fn resize(&mut self, nsize: Vec2i) {
 		if self.size == nsize { return }
 
@@ -39,6 +44,13 @@ impl Framebuffer {
 
 				gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGBA as i32, nsize.x, nsize.y, 0, 
 					gl::RGBA, gl::UNSIGNED_BYTE, 0 as *const _);
+			}
+
+			if let Some(ref tex) = self.depth_target {
+				let _guard = tex.bind_guard();
+
+				gl::TexImage2D(gl::TEXTURE_2D, 0, gl::DEPTH_COMPONENT as i32, nsize.x, nsize.y, 0, 
+					gl::DEPTH_COMPONENT, gl::UNSIGNED_INT, 0 as *const _);
 			}
 		}
 
@@ -52,7 +64,10 @@ pub struct FramebufferBuilder {
 
 impl FramebufferBuilder {
 	pub fn new(size: Vec2i) -> Self {
-		let mut fb = Framebuffer { gl_handle: 0, targets: Vec::new(), size };
+		let mut fb = Framebuffer {
+			gl_handle: 0, targets: Vec::new(),
+			depth_target: None, size
+		};
 
 		unsafe {
 			gl::GenFramebuffers(1, &mut fb.gl_handle);
@@ -68,12 +83,15 @@ impl FramebufferBuilder {
 		self.fb
 	}
 
-	pub fn add_depth(self) -> Self {
+	pub fn add_depth(mut self) -> Self {
 		let mut gl_handle = 0;
+
+		assert!(self.fb.depth_target.is_none(), "Framebuffer can only have one depth target");
 
 		unsafe {
 			gl::GenTextures(1, &mut gl_handle);
-			gl::BindTexture(gl::TEXTURE_2D, gl_handle);
+			let _guard = TextureBindGuard::new_raw(gl_handle);
+
 			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
 			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
 			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
@@ -84,9 +102,9 @@ impl FramebufferBuilder {
 
 			gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::DEPTH_ATTACHMENT, 
 				gl::TEXTURE_2D, gl_handle, 0);
+		}
 
-			gl::BindTexture(gl::TEXTURE_2D, 0);
-		}		
+		self.fb.depth_target = Some(Texture{gl_handle, size: self.fb.size});
 
 		self
 	}
@@ -98,7 +116,8 @@ impl FramebufferBuilder {
 
 		unsafe {
 			gl::GenTextures(1, &mut gl_handle);
-			gl::BindTexture(gl::TEXTURE_2D, gl_handle);
+			let _guard = TextureBindGuard::new_raw(gl_handle);
+
 			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
 			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
 			gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
@@ -108,8 +127,6 @@ impl FramebufferBuilder {
 				gl::RGBA, gl::UNSIGNED_BYTE, 0 as *const _);
 
 			gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0 + next_target, gl::TEXTURE_2D, gl_handle, 0);
-
-			gl::BindTexture(gl::TEXTURE_2D, 0);
 		}
 
 		self.fb.targets.push(Texture{gl_handle, size: self.fb.size});

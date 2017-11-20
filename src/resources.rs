@@ -5,3 +5,5 @@ pub static STAR_SHADER_FRAG_SRC: &'static str = include_str!("../assets/star.fra
 pub static COLOR_SHADER_FRAG_SRC: &'static str = include_str!("../assets/color.frag");
 pub static CRYSTAL_SHADER_VERT_SRC: &'static str = include_str!("../assets/crystal.vert");
 pub static CRYSTAL_SHADER_FRAG_SRC: &'static str = include_str!("../assets/crystal.frag");
+
+pub static STAR_COMPOSE_SHADER_FRAG_SRC: &'static str = include_str!("../assets/star_compose.frag");
