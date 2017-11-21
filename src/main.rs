@@ -38,7 +38,7 @@ pub use resources::*;
 pub use easing::*;
 pub use math::*;
 
-use rand::{random, Closed01};
+use rand::{random, Closed01, thread_rng, Rng};
 
 pub fn rand_f32(range: f32) -> f32 {
 	let Closed01(f) = random::<Closed01<f32>>();
@@ -101,7 +101,6 @@ fn main() {
 
 pub struct MainContext {
 	viewport: Viewport,
-	shader_fb: Shader,
 	shader_star: Shader,
 	shader_color: Shader,
 	shader_crystal: Shader,
@@ -113,6 +112,7 @@ pub struct MainContext {
 	crystal_mesh: Mesh,
 	crystal_mesh_points: Mesh,
 	crystal_targets: [Framebuffer; 2],
+	crystal_refract_idx: f32,
 
 	quad_mesh: Mesh,
 	star_mesh: Mesh,
@@ -199,7 +199,6 @@ impl MainContext {
 
 		MainContext {
 			viewport: Viewport::new(),
-			shader_fb: Shader::new(&FB_SHADER_VERT_SRC, &FB_SHADER_FRAG_SRC),
 			shader_star: Shader::new(&STAR_SHADER_VERT_SRC, &STAR_SHADER_FRAG_SRC),
 			shader_color: Shader::new(&FB_SHADER_VERT_SRC, &COLOR_SHADER_FRAG_SRC),
 			shader_crystal: Shader::new(&CRYSTAL_SHADER_VERT_SRC, &CRYSTAL_SHADER_FRAG_SRC),
@@ -211,6 +210,7 @@ impl MainContext {
 			crystal_mesh: Mesh::new(),
 			crystal_mesh_points: Mesh::new(),
 			crystal_targets,
+			crystal_refract_idx: 1.0,
 
 			quad_mesh,
 			star_mesh,
@@ -345,6 +345,8 @@ impl MainContext {
 				self.shader_star_compose.use_program();
 				self.shader_star_compose.set_proj(&proj_mat);
 				self.shader_star_compose.set_uniform_mat("inv_proj", &proj_mat.inverse());
+				self.shader_star_compose.set_uniform_f32("u_refractive_index", self.crystal_refract_idx);
+
 				self.shader_star_compose.set_uniform_i32("u_color0", 0);
 				self.shader_star_compose.set_uniform_i32("u_color1", 1);
 				self.shader_star_compose.set_uniform_i32("u_depth0", 2);
@@ -422,5 +424,7 @@ impl MainContext {
 		self.cmbuilder.clear();
 		crystal.build_points(&mut self.cmbuilder);
 		self.cmbuilder.upload_to(&mut self.crystal_mesh_points);
+
+		self.crystal_refract_idx = thread_rng().gen_range(1.0 / 4.0, 1.0 / 1.01);
 	}
 }

@@ -102,8 +102,8 @@ impl Crystal {
 			}
 
 			let normal = vs.windows(3).fold(Vec3::zero(), |a, v| {
-				let d0 = v[1] - v[0];
-				let d1 = v[1] - v[2];
+				let d0 = v[1] - v[2];
+				let d1 = v[1] - v[0];
 				a + d0.cross(d1)
 			}).normalize();
 
