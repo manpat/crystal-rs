@@ -6,4 +6,7 @@ pub static COLOR_SHADER_FRAG_SRC: &'static str = include_str!("../assets/color.f
 pub static CRYSTAL_SHADER_VERT_SRC: &'static str = include_str!("../assets/crystal.vert");
 pub static CRYSTAL_SHADER_FRAG_SRC: &'static str = include_str!("../assets/crystal.frag");
 
+pub static BASIC_TRANSFORM_SHADER_VERT_SRC: &'static str = include_str!("../assets/basic_transform.vert");
+
+pub static LINE_FUZZ_SHADER_FRAG_SRC: &'static str = include_str!("../assets/line_fuzz.frag");
 pub static STAR_COMPOSE_SHADER_FRAG_SRC: &'static str = include_str!("../assets/star_compose.frag");

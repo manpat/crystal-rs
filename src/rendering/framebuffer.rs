@@ -77,6 +77,21 @@ impl FramebufferBuilder {
 		FramebufferBuilder { fb }
 	}
 
+	pub fn new_unsized() -> Self {
+		let mut fb = Framebuffer {
+			gl_handle: 0, targets: Vec::new(),
+			depth_target: None,
+			size: Vec2i::splat(1)
+		};
+
+		unsafe {
+			gl::GenFramebuffers(1, &mut fb.gl_handle);
+			fb.bind();
+		}
+
+		FramebufferBuilder { fb }
+	}
+
 	pub fn finalize(self) -> Framebuffer {
 		Framebuffer::unbind();
 

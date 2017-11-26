@@ -1,7 +1,7 @@
 precision mediump float;
 
 uniform mat4 view;
-uniform vec3 color;
+uniform vec3 u_color;
 
 varying vec3 v_normal;
 

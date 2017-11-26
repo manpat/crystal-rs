@@ -52,7 +52,7 @@ impl Crystal {
 		}
 	}
 
-	pub fn build_lines(&self, mb: &mut mesh_builder::MeshBuilder) {
+	pub fn build_face_lines(&self, mb: &mut mesh_builder::MeshBuilder) {
 		use mesh_builder::Vertex as MBVert;
 
 		let vs = &self.verts;
@@ -86,6 +86,48 @@ impl Crystal {
 				mb.add_vert(MBVert::new(center + d0 * Vec3::new(margin, margin_y, margin)));
 				mb.add_vert(MBVert::new(center + d1 * Vec3::new(margin, margin_y, margin)));
 			}
+		}
+	}
+
+	pub fn build_edges(&self, mb: &mut mesh_builder::MeshBuilder, offset: f32) {
+		use mesh_builder::Vertex as MBVert;
+
+		let vs = &self.verts;
+		let mut seen = Vec::new();
+
+		let vnorms = vs.iter()
+			.map(|v| {
+				let start = v.1;
+
+				let mut count = 1u32;
+				let mut norm_acc = self.edge_normal(start);
+
+				let mut it = self.edge_next(self.edge_twin(start));
+				while it != start {
+					count += 1;
+					norm_acc = norm_acc + self.edge_normal(it);
+
+					it = self.edge_next(self.edge_twin(it));
+				}
+
+				(norm_acc / count as f32).normalize()
+			})
+			.collect::<Vec<_>>();
+
+		for (idx, edge) in self.edges.iter().enumerate() {
+			if seen.contains(&idx) { continue }
+
+			seen.push(idx);
+			seen.push(edge.twin);
+
+			let v0 = vs[edge.vertex].0;
+			let v1 = self.edge_origin(edge.next);
+
+			let normal0 = vnorms[edge.vertex];
+			let normal1 = vnorms[self.edges[edge.next].vertex];
+
+			mb.add_vert(MBVert::new(v0 + normal0 * offset));
+			mb.add_vert(MBVert::new(v1 + normal1 * offset));
 		}
 	}
 
@@ -691,6 +733,15 @@ impl Crystal {
 
 	fn edge_origin(&self, e: usize) -> Vec3 {
 		self.verts[self.edges[e].vertex].0
+	}
+
+	fn edge_normal(&self, e: usize) -> Vec3 {
+		let edge = &self.edges[e];
+		let v0 = self.edge_origin(edge.prev);
+		let v1 = self.edge_origin(e);
+		let v2 = self.edge_origin(edge.next);
+
+		(v1 - v2).cross(v1 - v0).normalize()
 	}
 }
 

@@ -101,9 +101,11 @@ fn main() {
 
 pub struct MainContext {
 	viewport: Viewport,
+	shader_fb: Shader,
 	shader_star: Shader,
 	shader_color: Shader,
 	shader_crystal: Shader,
+	shader_line_fuzz: Shader,
 	shader_star_compose: Shader,
 	prev_frame: time::Instant,
 	time: f64,
@@ -113,6 +115,8 @@ pub struct MainContext {
 	crystal_mesh_lines: Mesh,
 	crystal_targets: [Framebuffer; 2],
 	crystal_refract_idx: f32,
+	crystal_line_targets: [Framebuffer; 2],
+	target_flip: usize,
 
 	quad_mesh: Mesh,
 	star_mesh: Mesh,
@@ -177,32 +181,42 @@ impl MainContext {
 
 		quad_builder.upload_to(&mut quad_mesh);
 
-		let mut star_target = FramebufferBuilder::new(Vec2i::splat(1))
+		let mut star_target = FramebufferBuilder::new_unsized()
 			.add_target()
 			.finalize();
 
 		star_target.get_target(0).unwrap().nearest();
 
 		let crystal_targets = [
-			FramebufferBuilder::new(Vec2i::splat(1))
+			FramebufferBuilder::new_unsized()
 				.add_target()
 				.add_depth()
 				.finalize(),
 
-			FramebufferBuilder::new(Vec2i::splat(1))
+			FramebufferBuilder::new_unsized()
 				.add_target()
 				.add_depth()
 				.finalize(),
 		];
 
-		// crystal_target.get_target(0).unwrap().nearest();
+		let crystal_line_targets = [
+			FramebufferBuilder::new_unsized()
+				.add_target()
+				.finalize(),
+
+			FramebufferBuilder::new_unsized()
+				.add_target()
+				.finalize(),
+		];
 
 		MainContext {
 			viewport: Viewport::new(),
-			shader_star: Shader::new(&STAR_SHADER_VERT_SRC, &STAR_SHADER_FRAG_SRC),
-			shader_color: Shader::new(&FB_SHADER_VERT_SRC, &COLOR_SHADER_FRAG_SRC),
-			shader_crystal: Shader::new(&CRYSTAL_SHADER_VERT_SRC, &CRYSTAL_SHADER_FRAG_SRC),
-			shader_star_compose: Shader::new(&FB_SHADER_VERT_SRC, &STAR_COMPOSE_SHADER_FRAG_SRC),
+			shader_fb: Shader::new(FB_SHADER_VERT_SRC, FB_SHADER_FRAG_SRC),
+			shader_star: Shader::new(STAR_SHADER_VERT_SRC, STAR_SHADER_FRAG_SRC),
+			shader_color: Shader::new(BASIC_TRANSFORM_SHADER_VERT_SRC, COLOR_SHADER_FRAG_SRC),
+			shader_crystal: Shader::new(CRYSTAL_SHADER_VERT_SRC, CRYSTAL_SHADER_FRAG_SRC),
+			shader_line_fuzz: Shader::new(FB_SHADER_VERT_SRC, LINE_FUZZ_SHADER_FRAG_SRC),
+			shader_star_compose: Shader::new(FB_SHADER_VERT_SRC, STAR_COMPOSE_SHADER_FRAG_SRC),
 			prev_frame: time::Instant::now(),
 			time: 0.0,
 
@@ -211,6 +225,8 @@ impl MainContext {
 			crystal_mesh_lines: Mesh::new(),
 			crystal_targets,
 			crystal_refract_idx: 1.0,
+			crystal_line_targets,
+			target_flip: 0,
 
 			quad_mesh,
 			star_mesh,
@@ -256,6 +272,8 @@ impl MainContext {
 		self.fit_canvas();
 		self.crystal_targets[0].resize(self.viewport.size);
 		self.crystal_targets[1].resize(self.viewport.size);
+		self.crystal_line_targets[0].resize(self.viewport.size);
+		self.crystal_line_targets[1].resize(self.viewport.size);
 		self.star_target.resize(self.viewport.size);
 
 		if self.crystal_mesh.count < 3 {
@@ -285,6 +303,7 @@ impl MainContext {
 			
 			self.star_target.bind();
 			self.shader_color.use_program();
+			self.shader_color.set_proj(&Mat4::ident());
 			self.shader_color.set_uniform_vec4("u_color", &Vec4::new(0.0, 0.0, 0.0, 0.15));
 			self.quad_mesh.bind();
 			self.quad_mesh.draw(gl::TRIANGLES);
@@ -323,14 +342,14 @@ impl MainContext {
 			gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
 			gl::FrontFace(gl::CW);
-			self.shader_crystal.set_uniform_vec3("color", &Vec3::new(0.9, 0.0, 0.5));
+			self.shader_crystal.set_uniform_vec3("u_color", &Vec3::new(0.9, 0.0, 0.5));
 			self.crystal_mesh.draw(gl::TRIANGLES);
 
 			self.crystal_targets[1].bind();
 			gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
 			gl::FrontFace(gl::CCW);
-			self.shader_crystal.set_uniform_vec3("color", &Vec3::new(0.3, 0.0, 1.0));
+			self.shader_crystal.set_uniform_vec3("u_color", &Vec3::new(0.3, 0.0, 1.0));
 			self.crystal_mesh.draw(gl::TRIANGLES);
 
 			Framebuffer::unbind();
@@ -358,6 +377,46 @@ impl MainContext {
 
 				Texture::unbind();
 			}
+
+			
+			gl::Disable(gl::DEPTH_TEST);
+
+			self.crystal_line_targets[self.target_flip].bind();
+			
+			// Fade
+			self.shader_color.use_program();
+			self.shader_color.set_proj(&Mat4::ident());
+			self.shader_color.set_uniform_vec4("u_color", &Vec4::new(0.0, 0.0, 0.0, 0.01));
+			self.quad_mesh.bind();
+			self.quad_mesh.draw(gl::TRIANGLES);
+
+			// Draw
+			self.shader_color.set_proj(&view_proj);
+			self.shader_color.set_uniform_vec4("u_color", &Vec4::new(0.9, 0.85, 0.87, 0.15));
+			self.crystal_mesh_lines.bind();
+			self.crystal_mesh_lines.draw(gl::LINES);
+			Framebuffer::unbind();
+
+			self.shader_line_fuzz.use_program();
+			self.shader_line_fuzz.set_uniform_i32("u_color", 0);
+			self.shader_line_fuzz.set_uniform_f32("u_aspect", self.viewport.get_aspect());
+			self.shader_line_fuzz.set_uniform_f32("u_time", self.time as f32);
+
+			self.crystal_line_targets[1 - self.target_flip].bind();
+			self.crystal_line_targets[self.target_flip].get_target(0).unwrap().bind_to_slot(0);
+
+			self.quad_mesh.bind();
+			self.quad_mesh.draw(gl::TRIANGLES);
+			Framebuffer::unbind();
+
+			self.target_flip = 1 - self.target_flip;
+
+			self.crystal_line_targets[self.target_flip].get_target(0).unwrap().bind_to_slot(0);
+			self.shader_fb.use_program();
+			self.quad_mesh.bind();
+			self.quad_mesh.draw(gl::TRIANGLES);
+
+			gl::Enable(gl::DEPTH_TEST);
 		}
 	}
 
@@ -421,7 +480,7 @@ impl MainContext {
 		self.cmbuilder.upload_to(&mut self.crystal_mesh);
 
 		self.cmbuilder.clear();
-		crystal.build_lines(&mut self.cmbuilder);
+		crystal.build_edges(&mut self.cmbuilder, 0.05);
 		self.cmbuilder.upload_to(&mut self.crystal_mesh_lines);
 
 		self.crystal_refract_idx = thread_rng().gen_range(1.0 / 4.0, 1.0 / 1.01);
