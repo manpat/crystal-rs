@@ -28,10 +28,14 @@ uniform float u_time;
 
 void main() {
 	vec4 bgcolor = texture2D(u_bgcolor, v_uv);
-
 	vec4 front_color = texture2D(u_color1, v_uv);
-	vec3 front_normal = normalize(front_color.rgb * 2.0 - 1.0);
 
+	if(front_color.a < 0.5) {
+		gl_FragColor = vec4(bgcolor.rgb, 1.0);
+		return;
+	}
+
+	vec3 front_normal = normalize(front_color.rgb * 2.0 - 1.0);
 	float front_depth = texture2D(u_depth1, v_uv).r;
 
 	vec4 world_pos = inv_proj * vec4(v_uv * 2.0 - 1.0, front_depth, 1.0);
@@ -47,7 +51,6 @@ void main() {
 	float step = 2.0;
 	float subdivisions = 4.0;
 
-	// vec3 exit_dir = vec3(0.0);
 	vec3 back_normal = vec3(0.0);
 
 	for(float i = 0.0; i < 16.0; i += 1.0) {
@@ -75,10 +78,7 @@ void main() {
 			back_normal = normalize(back_color * 2.0 - 1.0);
 
 			vec3 exit_dir = refract(dir, -back_normal, u_refractive_index);
-
-			ray_pos += exit_dir * 2.0;
-
-			vec4 screen_pos = proj * vec4(ray_pos, 1.0);
+			vec4 screen_pos = proj * vec4(ray_pos + exit_dir * 2.0, 1.0);
 			screen_pos /= screen_pos.w;
 
 			star_sample_pos = screen_pos.xy * 0.5 + 0.5;
@@ -102,16 +102,7 @@ void main() {
 	vec3 color = front_spec + (back_spec * (1.0 - travel_dist * 0.1)) + texture2D(u_bgcolor, star_sample_pos).rgb;
 
 	// Inner glow
-	color += vec3(1.0, 0.0, 0.27) * clamp((travel_dist - 2.6) * 0.1, 0.0, 0.25);
+	color += vec3(1.0, 0.0, 0.27) * clamp((travel_dist - 0.6) * 0.1, 0.0, 0.25);
 
-	// vec3 color = vec3(mod(star_sample_pos, 1.0), 0.0);
-	// vec3 color = vec3(mod(travel_dist * 0.1, 1.0));
-	// vec3 color = vec3(travel_dist * 0.3);
-	// vec3 color = front_color.rgb;
-	// vec3 color = exit_dir * 0.5 + 0.5;
-	// vec3 color = back_normal * 0.5 + 0.5;
-
-	// vec3 diff = world_pos.xyz - front_world_pos.xyz;
-
-	gl_FragColor = vec4(color * front_color.a + bgcolor.rgb * (1.0 - front_color.a), 1.0);
+	gl_FragColor = vec4(color, 1.0);
 }

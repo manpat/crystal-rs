@@ -110,7 +110,7 @@ pub struct MainContext {
 
 	cmbuilder: MeshBuilder,
 	crystal_mesh: Mesh,
-	crystal_mesh_points: Mesh,
+	crystal_mesh_lines: Mesh,
 	crystal_targets: [Framebuffer; 2],
 	crystal_refract_idx: f32,
 
@@ -208,7 +208,7 @@ impl MainContext {
 
 			cmbuilder: MeshBuilder::new(),
 			crystal_mesh: Mesh::new(),
-			crystal_mesh_points: Mesh::new(),
+			crystal_mesh_lines: Mesh::new(),
 			crystal_targets,
 			crystal_refract_idx: 1.0,
 
@@ -418,12 +418,11 @@ impl MainContext {
 		crystal.generate();
 		self.cmbuilder.clear();
 		crystal.build_faces(&mut self.cmbuilder);
-		// crystal.build_lines(&mut self.cmbuilder);
 		self.cmbuilder.upload_to(&mut self.crystal_mesh);
 
 		self.cmbuilder.clear();
-		crystal.build_points(&mut self.cmbuilder);
-		self.cmbuilder.upload_to(&mut self.crystal_mesh_points);
+		crystal.build_lines(&mut self.cmbuilder);
+		self.cmbuilder.upload_to(&mut self.crystal_mesh_lines);
 
 		self.crystal_refract_idx = thread_rng().gen_range(1.0 / 4.0, 1.0 / 1.01);
 	}
