@@ -383,16 +383,9 @@ impl MainContext {
 
 			self.crystal_line_targets[self.target_flip].bind();
 			
-			// Fade
 			self.shader_color.use_program();
-			self.shader_color.set_proj(&Mat4::ident());
-			self.shader_color.set_uniform_vec4("u_color", &Vec4::new(0.0, 0.0, 0.0, 0.01));
-			self.quad_mesh.bind();
-			self.quad_mesh.draw(gl::TRIANGLES);
-
-			// Draw
 			self.shader_color.set_proj(&view_proj);
-			self.shader_color.set_uniform_vec4("u_color", &Vec4::new(0.9, 0.85, 0.87, 0.15));
+			self.shader_color.set_uniform_vec4("u_color", &Vec4::new(0.9, 0.85, 0.87, 0.4));
 			self.crystal_mesh_lines.bind();
 			self.crystal_mesh_lines.draw(gl::LINES);
 			Framebuffer::unbind();
