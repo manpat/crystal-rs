@@ -1,5 +1,5 @@
 use rendering::mesh_builder;
-use math::*;
+use common::*;
 
 use rand::{thread_rng, Rng};
 
@@ -454,7 +454,7 @@ impl Crystal {
 		let mut edge_data = vec![EdgeData::Unseen; self.edges.len()];
 
 		for (it, &edge) in self.edges.iter().enumerate() {
-			if !match_enum!(edge_data[it], EdgeData::Unseen) { continue }
+			if !match_pattern!(edge_data[it], EdgeData::Unseen) { continue }
 
 			let clip_origin = vertex_clip_data[edge.vertex];
 			let clip_dest = vertex_clip_data[self.edges[edge.next].vertex];

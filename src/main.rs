@@ -5,25 +5,11 @@
 #![feature(slice_patterns)]
 #![feature(inclusive_range_syntax)]
 
-extern crate rand;
-
-#[macro_use]
-mod enums {
-	macro_rules! match_enum {
-		($v:expr, $p:pat) => {
-			match $v {
-				$p => true,
-				_ => false,
-			}
-		}
-	}
-}
+extern crate common;
+pub use common::*;
 
 mod resources;
 mod rendering;
-mod easing;
-mod math;
-
 mod crystal;
 
 #[macro_use] mod ems;
@@ -35,8 +21,6 @@ use rendering::framebuffer::{Framebuffer, FramebufferBuilder};
 use rendering::*;
 
 pub use resources::*;
-pub use easing::*;
-pub use math::*;
 
 use rand::{random, Closed01, thread_rng, Rng};
 
@@ -315,7 +299,8 @@ impl MainContext {
 
 			for i in 0...max_star_steps {
 				let a = i as f32 / max_star_steps as f32;
-				let rotation = (self.rotation * (1.0 - a) + new_rotation * a).normalize();
+				// let rotation = (self.rotation * (1.0 - a) + new_rotation * a).normalize();
+				let rotation = a.ease_linear(self.rotation, new_rotation).normalize();
 
 				let view_mat = trans_mat * rotation.to_mat4();
 				let view_proj = proj_mat * view_mat;

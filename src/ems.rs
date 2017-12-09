@@ -4,7 +4,7 @@ use std::mem::transmute;
 use std::ffi::CString;
 use std::ptr;
 
-use math::Vec2i;
+use common::Vec2i;
 
 use ::MainContext;
 
