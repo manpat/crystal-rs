@@ -297,7 +297,7 @@ impl MainContext {
 
 			let max_star_steps = 100u32;
 
-			for i in 0...max_star_steps {
+			for i in 0..=max_star_steps {
 				let a = i as f32 / max_star_steps as f32;
 				// let rotation = (self.rotation * (1.0 - a) + new_rotation * a).normalize();
 				let rotation = a.ease_linear(self.rotation, new_rotation).normalize();
