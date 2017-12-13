@@ -39,7 +39,7 @@ r##"<html>
 
 	<body>
 		<canvas id="canvas"></canvas>
-		<script src="target/asmjs-unknown-emscripten/[[build_type]]/crystal.js"></script>
+		<script src="[[pkg_name]]/[[build_type]].js"></script>
 	</body>
 </html>"##;
 
@@ -51,7 +51,12 @@ fn main() {
 		.write_bindings(StaticGenerator, &mut file)
 		.unwrap();
 
-	let index_html = INDEX_HTML_TEMPLATE.to_string().replace("[[build_type]]", &env::var("PROFILE").unwrap());
+	let profile = env::var("PROFILE").unwrap();
+
+	let index_html = INDEX_HTML_TEMPLATE.to_string()
+		.replace("[[build_type]]", &profile)
+		.replace("[[pkg_name]]", env!("CARGO_PKG_NAME"));
+		
 	let dest = env::var("CARGO_MANIFEST_DIR").unwrap();
 	let path = Path::new(&dest).join("index.html");
 	let mut file = File::create(&path).unwrap();
