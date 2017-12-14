@@ -1,0 +1,3 @@
+/crystal => index.html
+/crystal/debug.js => target/asmjs-unknown-emscripten/debug/crystal.js
+/crystal/release.js => target/asmjs-unknown-emscripten/release/crystal.js
