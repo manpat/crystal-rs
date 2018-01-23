@@ -29,9 +29,16 @@ r##"<html>
 				width: 100vw;
 				height: 100vh;
 				overflow: hidden;
+				position: fixed;
 			}
 
 			canvas {
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				
 				overflow: hidden;
 				display: block;
 			}
