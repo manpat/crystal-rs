@@ -187,10 +187,10 @@ macro_rules! js {
 
 pub fn register_callbacks(ctx: *mut MainContext) {
 	unsafe {
-		emscripten_set_touchstart_callback(ptr::null(), ctx as *mut u8, 0, on_touch_down);
-		emscripten_set_touchend_callback(ptr::null(), ctx as *mut u8, 0, on_touch_up);
-		emscripten_set_touchmove_callback(ptr::null(), ctx as *mut u8, 0, on_touch_move);
-		emscripten_set_touchcancel_callback(ptr::null(), ctx as *mut u8, 0, on_touch_up);
+		emscripten_set_touchstart_callback(ptr::null(), ctx as *mut u8, 1, on_touch_down);
+		emscripten_set_touchend_callback(ptr::null(), ctx as *mut u8, 1, on_touch_up);
+		emscripten_set_touchmove_callback(ptr::null(), ctx as *mut u8, 1, on_touch_move);
+		emscripten_set_touchcancel_callback(ptr::null(), ctx as *mut u8, 1, on_touch_up);
 
 		emscripten_set_mousedown_callback(ptr::null(), ctx as *mut u8, 0, on_mouse_down);
 		emscripten_set_mouseup_callback(ptr::null(), ctx as *mut u8, 0, on_mouse_up);
@@ -218,7 +218,7 @@ extern fn on_touch_down(_: i32, ev: *const EmscriptenTouchEvent, ud: *mut u8) ->
 		}
 	}
 
-	0
+	1
 }
 
 extern fn on_touch_up(_: i32, ev: *const EmscriptenTouchEvent, ud: *mut u8) -> i32 {
@@ -234,7 +234,7 @@ extern fn on_touch_up(_: i32, ev: *const EmscriptenTouchEvent, ud: *mut u8) -> i
 		}
 	}
 
-	0
+	1
 }
 
 extern fn on_touch_move(_: i32, ev: *const EmscriptenTouchEvent, ud: *mut u8) -> i32 {
@@ -248,7 +248,7 @@ extern fn on_touch_move(_: i32, ev: *const EmscriptenTouchEvent, ud: *mut u8) ->
 		}
 	}
 
-	0
+	1
 }
 
 
