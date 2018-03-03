@@ -302,7 +302,7 @@ impl MainContext {
 				// let rotation = (self.rotation * (1.0 - a) + new_rotation * a).normalize();
 				let rotation = a.ease_linear(self.rotation, new_rotation).normalize();
 
-				let view_mat = trans_mat * rotation.to_mat4();
+				let view_mat = trans_mat * rotation.conjugate().to_mat4();
 				let view_proj = proj_mat * view_mat;
 
 				self.shader_star.set_proj(&view_proj);
@@ -313,7 +313,7 @@ impl MainContext {
 
 			self.rotation = new_rotation;
 
-			let view_mat = trans_mat * new_rotation.to_mat4();
+			let view_mat = trans_mat * new_rotation.conjugate().to_mat4();
 			let view_proj = proj_mat * view_mat;
 
 			self.shader_crystal.use_program();
